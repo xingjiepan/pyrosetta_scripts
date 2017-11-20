@@ -5,10 +5,14 @@ structure.
 import re
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import pyrosetta
 from pyrosetta import rosetta
 
+
+AAs = ['A', 'P', 'V', 'L', 'I', 'M', 'G', 'F', 'Y', 'W', 
+       'S', 'T', 'C', 'H', 'R', 'K', 'D', 'E', 'N', 'Q']
 
 def get_chunk_abego(chunk, abego_manager):
     '''Get the ABEGO sequence for a vall chunk.'''
@@ -28,7 +32,12 @@ def get_pose_abege(pose):
     for i in range(1, pose.size() + 1):
         abego_list.append(abego_manager.index2symbol(abego_manager.torsion2index_level1(
             pose.phi(i), pose.psi(i), pose.omega(i))))
-    
+
+    # Set the abego at the terminus to be its nearst neighbors ABEGO
+
+    abego_list[0] = abego_list[1]
+    abego_list[pose.size() - 1] = abego_list[pose.size() - 2]
+
     return ''.join(abego_list)
 
 def find_sequences_for_abego_from_chunk(chunk, abego_pattern, abego_manager):
@@ -80,8 +89,6 @@ def get_pose_sequence_profile(pose, vall_path):
     # Count the number of AA at each position
 
     profile = []
-    AAs = ['A', 'P', 'V', 'L', 'I', 'M', 'G', 'F', 'Y', 'W', 
-           'S', 'T', 'C', 'H', 'R', 'K', 'D', 'E', 'N', 'Q']
     for i in range(pose.size()):
         p = {}
         for aa in AAs:
@@ -99,8 +106,18 @@ def get_pose_sequence_profile(pose, vall_path):
         s = sum(p[k] for k in p.keys())
         for k in p.keys():
             p[k] = p[k] / s
-
+        
     return profile
+
+def save_profile_to_pssm_file(profile, output_file):
+    '''Save a sequence profile to a text file.'''
+    with open(output_file, 'w') as f:
+        f.write(' '.join(AAs) + '\n')
+        for i, d in enumerate(profile):
+            f.write('{0} A '.format(i))
+            frequencies = ['{0:.4f}'.format(d[k]) for k in AAs] 
+            f.write('\t'.join(frequencies) + '\n')
+
 
 if __name__ == '__main__':
     pyrosetta.init()
@@ -108,11 +125,13 @@ if __name__ == '__main__':
     pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(pose, 'inputs/input.pdb')
 
-    #vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/tools/fragment_tools/vall.jul19.2011.gz'
-    vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/main/database/sampling/small.vall.gz'
+    vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/tools/fragment_tools/vall.jul19.2011.gz'
+    #vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/main/database/sampling/small.vall.gz'
 
 
-    get_pose_sequence_profile(pose, vall_path)
+    profile = get_pose_sequence_profile(pose, vall_path)
+
+    save_profile_to_pssm_file(profile, 'pssm.txt')
 
     #with open('test.fasta', 'w') as f:
     #    for i in range(min(999, len(sequences))):
