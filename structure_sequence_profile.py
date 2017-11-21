@@ -5,7 +5,6 @@ structure.
 import re
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 import pyrosetta
 from pyrosetta import rosetta
@@ -121,7 +120,7 @@ def save_profile_to_pssm_file(profile, output_file):
                     best_prob = d[k]
 
             frequencies = ['{0:.4f}'.format(d[k]) for k in AAs] 
-            f.write(best_aa + ' ' + '\t'.join(frequencies) + '\n')
+            f.write('{0} {1} '.format(i + 1, best_aa) + '\t'.join(frequencies) + '\n')
 
 def get_rosetta_profile_from_pssm(pssm_file):
     '''Load a rosetta profile from PSSM'''
