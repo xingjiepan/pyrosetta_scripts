@@ -11,8 +11,7 @@ import pyrosetta
 from pyrosetta import rosetta
 
 
-AAs = ['A', 'P', 'V', 'L', 'I', 'M', 'G', 'F', 'Y', 'W', 
-       'S', 'T', 'C', 'H', 'R', 'K', 'D', 'E', 'N', 'Q']
+AAs = [aa for aa in 'ACDEFGHIKLMNPQRSTVWY']
 
 def get_chunk_abego(chunk, abego_manager):
     '''Get the ABEGO sequence for a vall chunk.'''
@@ -114,10 +113,54 @@ def save_profile_to_pssm_file(profile, output_file):
     with open(output_file, 'w') as f:
         f.write(' '.join(AAs) + '\n')
         for i, d in enumerate(profile):
-            f.write('{0} A '.format(i))
-            frequencies = ['{0:.4f}'.format(d[k]) for k in AAs] 
-            f.write('\t'.join(frequencies) + '\n')
+            best_aa = 'A'
+            best_prob = 0
+            for k in AAs:
+                if d[k] > best_prob:
+                    best_aa = k
+                    best_prob = d[k]
 
+            frequencies = ['{0:.4f}'.format(d[k]) for k in AAs] 
+            f.write(best_aa + ' ' + '\t'.join(frequencies) + '\n')
+
+def get_rosetta_profile_from_pssm(pssm_file):
+    '''Load a rosetta profile from PSSM'''
+    profile = rosetta.core.sequence.SequenceProfile()
+    profile.read_from_checkpoint(pssm_file)
+
+def profile_to_energy_profile(profile, kT=1):
+    '''Convert the profile of frequencies to the profile
+    of energies.
+    '''
+    energy_profile = []
+    
+    for p in profile:
+        ep = {}
+
+        for aa in AAs:
+            ep[aa] = - kT * np.log(p[aa])
+
+        energy_profile.append(ep)
+    
+    return energy_profile
+
+def get_profile_constraint_list(profile):
+    '''Get a list of residue type constraint for the profile.'''
+    aa_name_map = {'A':'ALA', 'P':'PRO', 'V':'VAL', 'L':'LEU', 'I':'ILE', 'M':'MET',
+                   'F':'PHE', 'Y':'TYR', 'W':'TRP', 'S':'SER', 'T':'THR', 'C':'CYS',
+                   'K':'LYS', 'R':'ARG', 'H':'HIS', 'D':'ASP', 'E':'GLU', 'N':'ASN',
+                   'Q':'GLN', 'G':'GLY'}
+    
+    energy_profile = profile_to_energy_profile(profile)
+
+    constraints = []
+
+    for i, ep in enumerate(energy_profile):
+        for aa in AAs:
+            constraints.append(rosetta.core.scoring.constraints.ResidueTypeConstraint(
+                i + 1, aa, aa_name_map[aa], -ep[aa] ))
+
+    return constraints
 
 if __name__ == '__main__':
     pyrosetta.init()
@@ -125,13 +168,17 @@ if __name__ == '__main__':
     pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(pose, 'inputs/input.pdb')
 
-    vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/tools/fragment_tools/vall.jul19.2011.gz'
-    #vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/main/database/sampling/small.vall.gz'
-
+    #vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/tools/fragment_tools/vall.jul19.2011.gz'
+    vall_path = '/home/xingjie/Softwares/Rosetta/githubRepo/main/database/sampling/small.vall.gz'
 
     profile = get_pose_sequence_profile(pose, vall_path)
-
     save_profile_to_pssm_file(profile, 'pssm.txt')
+
+    get_profile_constraint_list(profile)
+
+    #get_rosetta_profile_from_pssm(pyrosetta.rosetta.utility.file.FileName('pssm.txt'))
+
+    
 
     #with open('test.fasta', 'w') as f:
     #    for i in range(min(999, len(sequences))):
