@@ -101,7 +101,7 @@ def strand_pattern_getter(loop_size):
     '''Loop pattern getter for strands.'''
     return '', '.' + 'B' * (loop_size - 1), ''
 
-def linker_AA_pattern_getter(loop_size):
+def linker_HH_pattern_getter(loop_size):
     '''Loop pattern getter for a linker that connects two helices.'''
     return 'AAA', 'A' + '.' * (loop_size - 1), 'AAAA'
 
@@ -109,19 +109,23 @@ def linker_EE_pattern_getter(loop_size):
     '''Loop pattern getter for a linker that connects two strands.'''
     return 'BB', 'B' + '.' * (loop_size - 1), 'BBB'
 
-def linker_AE_pattern_getter(loop_size):
+def linker_HE_pattern_getter(loop_size):
     '''Loop pattern getter for a linker that connects a helix and a strand.'''
     return 'AAA', 'A' + '.' * (loop_size - 1), 'BBB'
 
-def linker_EA_pattern_getter(loop_size):
+def linker_EH_pattern_getter(loop_size):
     '''Loop pattern getter for a linker that connects a strand and a helix.'''
     return 'BB', 'B' + '.' * (loop_size - 1), 'AAAA'
 
 if __name__ == '__main__':
     pyrosetta.init()
 
-    loop_sizes = [5, 14]
+    loop_sizes = list(range(3, 15))
     lh_db_path = "/home/xingjie/DataBases/loophash_db"
 
-    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, helix_pattern_getter, 'lh_db_helix')
-    sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, strand_pattern_getter, 'lh_db_strand')
+    sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, helix_pattern_getter, 'lh_db_helix')
+    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, strand_pattern_getter, 'lh_db_strand')
+    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, linkerHH_pattern_getter, 'lh_db_linker_HH')
+    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, linkerEE_pattern_getter, 'lh_db_linker_EE')
+    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, linkerHE_pattern_getter, 'lh_db_linker_HE')
+    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, linkerEH_pattern_getter, 'lh_db_linker_EH')
