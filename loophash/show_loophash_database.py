@@ -9,8 +9,9 @@ import lh_basic
 if __name__ == '__main__':
     pyrosetta.init()
 
-    loop_size = 14
-    lh_db_path = "lh_db_helix"
+    loop_size = 5 
+    lh_db_path = "lh_db_strand"
+    #lh_db_path = "lh_db_helix"
     #lh_db_path = "/home/xingjie/DataBases/loophash_db"
     
     lh_library = lh_basic.load_lh_library([loop_size], lh_db_path) 

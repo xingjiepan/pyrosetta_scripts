@@ -60,11 +60,15 @@ def save_loops_with_given_abego_pattern_into_a_new_db(lh_library, prefix_pattern
     abego_manager = rosetta.core.sequence.ABEGOManager()
     hashmap = lh_library.gethash(len(loop_pattern))
 
-    with open(output_file, 'w') as f:
-        for i in range(hashmap.n_loops()):
-        #for i in range(1000): ###DEBUG
-            if check_loop_abego(lh_library, i, prefix_pattern, loop_pattern, suffix_pattern, abego_manager):
+    selected_ids = []
+    for i in range(hashmap.n_loops()):
+    #for i in range(1000): ###DEBUG
+        if check_loop_abego(lh_library, i, prefix_pattern, loop_pattern, suffix_pattern, abego_manager):
+            selected_ids.append(i)
    
+    if len(selected_ids) > 0: 
+        with open(output_file, 'w') as f:
+            for i in selected_ids:
                 leap_index = hashmap.get_peptide(i)
                 f.write('{0} {1} {2}\n'.format(leap_index.index, leap_index.offset, leap_index.key))
 
@@ -93,10 +97,31 @@ def helix_pattern_getter(loop_size):
     '''Loop pattern getter for helices.'''
     return '', '.' + 'A' * (loop_size - 1), ''
 
+def strand_pattern_getter(loop_size):
+    '''Loop pattern getter for strands.'''
+    return '', '.' + 'B' * (loop_size - 1), ''
+
+def linker_AA_pattern_getter(loop_size):
+    '''Loop pattern getter for a linker that connects two helices.'''
+    return 'AAA', 'A' + '.' * (loop_size - 1), 'AAAA'
+
+def linker_EE_pattern_getter(loop_size):
+    '''Loop pattern getter for a linker that connects two strands.'''
+    return 'BB', 'B' + '.' * (loop_size - 1), 'BBB'
+
+def linker_AE_pattern_getter(loop_size):
+    '''Loop pattern getter for a linker that connects a helix and a strand.'''
+    return 'AAA', 'A' + '.' * (loop_size - 1), 'BBB'
+
+def linker_EA_pattern_getter(loop_size):
+    '''Loop pattern getter for a linker that connects a strand and a helix.'''
+    return 'BB', 'B' + '.' * (loop_size - 1), 'AAAA'
+
 if __name__ == '__main__':
     pyrosetta.init()
 
     loop_sizes = [5, 14]
     lh_db_path = "/home/xingjie/DataBases/loophash_db"
 
-    sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, helix_pattern_getter, 'lh_db_helix')
+    #sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, helix_pattern_getter, 'lh_db_helix')
+    sort_loophash_db_into_a_new_db(lh_db_path, loop_sizes, strand_pattern_getter, 'lh_db_strand')
