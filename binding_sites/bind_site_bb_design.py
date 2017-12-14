@@ -12,6 +12,15 @@ def remove_terminal_variants(pose):
         if rosetta.core.pose.is_lower_terminus(pose, i):
             rosetta.core.pose.remove_lower_terminus_type_from_pose_residue(pose, i)
 
+def replace_intra_residue_torsions(pose, seqpos, ref_residue):
+    '''Replace the intra residue torsions at seqpos
+    by the torsions from the reference residue.
+    '''
+    ref_chis = ref_residue.chi()
+    
+    for i in range(1, pose.residue(seqpos).nchi() + 1):
+        pose.residue(seqpos).set_chi(i, ref_chis[i])
+
 
 if __name__ == '__main__':
     pyrosetta.init()
@@ -21,12 +30,13 @@ if __name__ == '__main__':
     remove_terminal_variants(pose)
     #rosetta.core.pose.correctly_add_cutpoint_variants(pose)
     
-    rotamers = rosetta.core.pack.rotamer_set.bb_independent_rotamers( pose.residue(1).type(), True ) 
+    rotamers = rosetta.core.pack.rotamer_set.bb_independent_rotamers( pose.residue(2).type(), True ) 
 
     print len(rotamers)
 
-    for i in range(1, len(rotamers) + 1):
-        pose.replace_residue(1, rotamers[i], False) 
-        #pose.replace_residue(1, rotamers[i], True) 
+    for i in range(2, len(rotamers) + 1):
+        #pose.replace_residue(2, rotamers[i], True) 
+
+        replace_intra_residue_torsions(pose, 2, rotamers[i])
 
         pose.dump_pdb('test_{0}.pdb'.format(i))
