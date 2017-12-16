@@ -166,6 +166,14 @@ def check_clashes(pose):
 
     return True
 
+def set_sses(pose, motif_residues, motif_ss_types):
+    '''Set secondary structures for motif residues.'''
+    for i, res in enumerate(motif_residues):
+        if 'H' == motif_ss_types[i]:
+            apply_ideal_helix(pose, res - 3, res + 3)
+        else:
+            apply_ideal_strand(pose, res - 3, res + 3)
+
 def find_parallel_sses(pose, motif_residues, motif_ss_types):
     '''Find Secondary structures that support a given binding site,
     The secondary structures should be approximately parallel to each
@@ -173,11 +181,7 @@ def find_parallel_sses(pose, motif_residues, motif_ss_types):
     '''
     # Set the secondary structures 
 
-    for i, res in enumerate(motif_residues):
-        if 'H' == motif_ss_types[i]:
-            apply_ideal_helix(pose, res - 3, res + 3)
-        else:
-            apply_ideal_strand(pose, res - 3, res + 3)
+    set_sses(pose, motif_residues, motif_ss_types)
 
     # Do combinitorial search
 
@@ -220,7 +224,7 @@ def find_parallel_sses(pose, motif_residues, motif_ss_types):
 
         for i in range(len(directions)):
             for j in range(i + 1, len(directions)):
-                if np.absolute(np.dot(directions[i], directions[j])) < 0.8:
+                if np.absolute(np.dot(directions[i], directions[j])) < 0.6:
                     sse_aligned = False
 
         if sse_aligned:
@@ -231,22 +235,36 @@ def find_parallel_sses(pose, motif_residues, motif_ss_types):
         if not next_rotamer_combination_id(combination_id, rotamer_set_sizes):
             break
 
+def dump_all_rotamers(pose, residue):
+    '''Dump all rotamers for a residue.'''
+    rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( pose.residue(residue).type(), True )
+
+    for i in range(len(rotamer_set)):
+        replace_intra_residue_torsions(pose, residue, rotamer_set[i + 1])
+        pose.dump_pdb('debug/test.{0}.{1}.pdb'.format(residue, i + 1))
+
 
 if __name__ == '__main__':
-    pyrosetta.init(options='-extra_res_fa inputs/LG1.params')
+    #pyrosetta.init(options='-extra_res_fa inputs/LG1.params')
+    pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params')
 
     pose = rosetta.core.pose.Pose()
-    #rosetta.core.import_pose.pose_from_file(pose, 'inputs/ke07_active_site_no_substrate.pdb')
-    rosetta.core.import_pose.pose_from_file(pose, 'inputs/ke07_active_site.pdb')
+    #rosetta.core.import_pose.pose_from_file(pose, 'inputs/ke07_active_site.pdb')
+    rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james.pdb')
     remove_terminal_variants(pose)
 
-    motif_residues, ligand_residue = insert_flanking_residues(pose, (1, 2, 3), 4)
+    #motif_residues, ligand_residue = insert_flanking_residues(pose, (1, 2, 3), 4)
+    #set_up_fold_tree(pose, motif_residues, ligand_residue, ['CZ2', 'OE1', 'CE1'], 'C1')
+    #find_parallel_sses(pose, motif_residues, ['H', 'E', 'H'])
 
-    set_up_fold_tree(pose, motif_residues, ligand_residue, ['CZ2', 'OE1', 'CE1'], 'C1')
+    motif_residues, ligand_residue = insert_flanking_residues(pose, (2, 3, 4), 1)
+    set_up_fold_tree(pose, motif_residues, ligand_residue, ['CZ2', 'OE1', 'CZ2'], 'C1')
+    #find_parallel_sses(pose, motif_residues, ['E', 'H', 'H'])
+    set_sses(pose, motif_residues, ['H', 'E', 'H'])
 
-    find_parallel_sses(pose, motif_residues, ['H', 'H', 'H'])
+    for res in motif_residues:
+        dump_all_rotamers(pose, res)
 
-    pose.dump_pdb('test.pdb')
-    exit()
+    #pose.dump_pdb('test.pdb')
     
 
