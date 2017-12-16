@@ -92,12 +92,17 @@ def insert_flanking_residues(pose, motif_residues, ligand_residue):
 
     return motif_residues_sorted, ligand_residue
 
-def set_up_fold_tree(pose, motif_residues, ligand_residue, motif_anchor_atoms, ligand_anchor_atom):
+def set_up_fold_tree(pose, motif_residues, ligand_residue, ligand_anchor_atom, motif_anchor_atoms=None):
     '''Set the fold tree for the system.
     Also add the cutpoint variants to the residues.
     '''
     ft = rosetta.core.kinematics.FoldTree()
-    
+   
+    if motif_anchor_atoms is None:
+        motif_anchor_atoms = []
+        for res in motif_residues:
+            motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms()))
+
     for i, res in enumerate(motif_residues):
         ft.add_edge(ligand_residue, res, i + 1)
         ft.set_jump_atoms(i + 1, ligand_anchor_atom, motif_anchor_atoms[i])
@@ -254,11 +259,11 @@ if __name__ == '__main__':
     remove_terminal_variants(pose)
 
     #motif_residues, ligand_residue = insert_flanking_residues(pose, (1, 2, 3), 4)
-    #set_up_fold_tree(pose, motif_residues, ligand_residue, ['CZ2', 'OE1', 'CE1'], 'C1')
+    #set_up_fold_tree(pose, motif_residues, ligand_residue, 'C1')
     #find_parallel_sses(pose, motif_residues, ['H', 'E', 'H'])
 
     motif_residues, ligand_residue = insert_flanking_residues(pose, (2, 3, 4), 1)
-    set_up_fold_tree(pose, motif_residues, ligand_residue, ['CZ2', 'OE1', 'CZ2'], 'C1')
+    set_up_fold_tree(pose, motif_residues, ligand_residue, 'C1')
     #find_parallel_sses(pose, motif_residues, ['E', 'H', 'H'])
     set_sses(pose, motif_residues, ['H', 'E', 'H'])
 
