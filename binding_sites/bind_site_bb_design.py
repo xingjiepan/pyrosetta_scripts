@@ -81,11 +81,16 @@ def insert_flanking_residues(pose, motif_residues, ligand_residue):
     for i in range(len(motif_residues_sorted)):
         if ligand_residue > motif_residues_sorted[i]:
             ligand_residue += 6
+        
+        # The order is important
 
         insert_alas(pose, motif_residues_sorted[i], 3, insert_after=True, reset_fold_tree=False)
         insert_alas(pose, motif_residues_sorted[i], 3, insert_after=False, reset_fold_tree=False)
 
         motif_residues_sorted[i] += 3
+        
+        for seqpos in range(motif_residues_sorted[i] - 3, motif_residues_sorted[i] + 3):
+            pose.conformation().declare_chemical_bond(seqpos, "C", seqpos + 1, "N")
 
         for j in range(i + 1, len(motif_residues_sorted)):
             motif_residues_sorted[j] += 6
@@ -97,15 +102,17 @@ def set_up_fold_tree(pose, motif_residues, ligand_residue, ligand_anchor_atom, m
     Also add the cutpoint variants to the residues.
     '''
     ft = rosetta.core.kinematics.FoldTree()
-   
+  
     if motif_anchor_atoms is None:
         motif_anchor_atoms = []
         for res in motif_residues:
-            motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms()))
+            #motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms())) ###This setting fails sometimes for unkonwn reason
+            motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms() - 2))
 
     for i, res in enumerate(motif_residues):
         ft.add_edge(ligand_residue, res, i + 1)
-        ft.set_jump_atoms(i + 1, ligand_anchor_atom, motif_anchor_atoms[i])
+        ft.set_jump_atoms(i + 1, ligand_residue, ligand_anchor_atom,
+                motif_residues[i], motif_anchor_atoms[i], True)
         ft.add_edge(res, res - 3, -1)
         ft.add_edge(res, res + 3, -1)
 
@@ -116,6 +123,23 @@ def set_up_fold_tree(pose, motif_residues, ligand_residue, ligand_anchor_atom, m
                 rosetta.core.chemical.CUTPOINT_UPPER, res - 3)
          rosetta.core.pose.remove_variant_type_from_pose_residue(pose,
                 rosetta.core.chemical.CUTPOINT_LOWER, res + 3)
+
+    ### DEBUG
+    #atom_pointer = rosetta.core.id.AtomID_Map_std_shared_ptr_core_kinematics_tree_Atom_t() 
+    #rosetta.core.conformation.build_tree( ft, pose.conformation().const_residues(), atom_pointer );
+   
+    #aid = rosetta.core.id.AtomID(8, 33)
+    #atom_pointer[aid].show()
+
+    #for i in [ligand_residue] + motif_residues:
+    #    for j in range(1, pose.residue(i).nheavyatoms() + 1):
+    #        aid = rosetta.core.id.AtomID(j, i)
+    #        print aid
+    #        for k in range(atom_pointer[aid].n_children()):
+    #            print '\t', atom_pointer[aid].child(k).id()
+    
+    #exit()
+    #### DEBUG
 
 def apply_ideal_helix(pose, start, stop):
     '''Make the residues from start to stop ideal helix.'''
@@ -240,13 +264,22 @@ def find_parallel_sses(pose, motif_residues, motif_ss_types):
         if not next_rotamer_combination_id(combination_id, rotamer_set_sizes):
             break
 
-def dump_all_rotamers(pose, residue):
+def dump_all_rotamers(pose, residue, ligand_residue):
     '''Dump all rotamers for a residue.'''
     rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( pose.residue(residue).type(), True )
-
+    
+    seqposes = rosetta.utility.vector1_unsigned_long()
+    seqposes.append(ligand_residue)
+    for i in range(residue - 3, residue + 4):
+        seqposes.append(i)
+    
     for i in range(len(rotamer_set)):
         replace_intra_residue_torsions(pose, residue, rotamer_set[i + 1])
-        pose.dump_pdb('debug/test.{0}.{1}.pdb'.format(residue, i + 1))
+
+        local_pose = rosetta.core.pose.Pose() 
+        rosetta.core.pose.pdbslice(local_pose, pose, seqposes)
+        local_pose.pdb_info().obsolete(True)
+        local_pose.dump_pdb('debug/test.{0}.{1}.pdb'.format(residue, i + 1))
 
 
 if __name__ == '__main__':
@@ -255,20 +288,23 @@ if __name__ == '__main__':
 
     pose = rosetta.core.pose.Pose()
     #rosetta.core.import_pose.pose_from_file(pose, 'inputs/ke07_active_site.pdb')
-    rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james.pdb')
+    rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james_renumbered.pdb')
+    #rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james_renumbered_small.pdb')
     remove_terminal_variants(pose)
 
     #motif_residues, ligand_residue = insert_flanking_residues(pose, (1, 2, 3), 4)
     #set_up_fold_tree(pose, motif_residues, ligand_residue, 'C1')
     #find_parallel_sses(pose, motif_residues, ['H', 'E', 'H'])
 
-    motif_residues, ligand_residue = insert_flanking_residues(pose, (2, 3, 4), 1)
+    motif_residues, ligand_residue = insert_flanking_residues(pose, list(range(2, pose.size() + 1)), 1)
     set_up_fold_tree(pose, motif_residues, ligand_residue, 'C1')
     #find_parallel_sses(pose, motif_residues, ['E', 'H', 'H'])
-    set_sses(pose, motif_residues, ['H', 'E', 'H'])
+    set_sses(pose, motif_residues, ['H'] * (pose.size() - 1))
+
+    print pose.fold_tree()
 
     for res in motif_residues:
-        dump_all_rotamers(pose, res)
+        dump_all_rotamers(pose, res, ligand_residue)
 
     #pose.dump_pdb('test.pdb')
     
