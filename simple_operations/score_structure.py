@@ -12,7 +12,7 @@ from pyrosetta import rosetta
 
 
 if __name__ == '__main__':
-    pyrosetta.init()
+    pyrosetta.init(options='-ignore_unrecognized_res true')
 
     # Load pose
 
