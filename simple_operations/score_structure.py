@@ -5,6 +5,7 @@ Usage:
 '''
 
 import sys
+import os
 
 import pyrosetta
 from pyrosetta import rosetta
@@ -24,4 +25,4 @@ if __name__ == '__main__':
     sfxn = rosetta.core.scoring.get_score_function()
     sfxn(pose)
 
-    pose.dump_pdb('scored_pose.pdb')
+    pose.dump_pdb(os.path.basename(pdb_file) + '.scored.pdb')
