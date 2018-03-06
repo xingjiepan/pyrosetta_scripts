@@ -133,7 +133,7 @@ def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pos
 
 
 def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
-        fuzz_pose, ligand_residue, motif_residues, fuzz_anchor):
+        fuzz_pose, ligand_residue, motif_residues, fuzz_anchor, fuzz_ball_anchor_rotamer_id):
     '''Find all rotamers that could match the anchored fuzz ball to the target pose.
     Args:
         target_pose: The target pose.
@@ -156,6 +156,8 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
 
     # Find matches for each motif residue
 
+    matches = []
+
     for motif_res in motif_residues:
         if motif_res == fuzz_anchor: continue
 
@@ -167,12 +169,13 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
         # Find all matches
 
         for target_seqpos in positions_to_test:
-            find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose,
+            residue_pair_matches = find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose,
                     motif_res)
 
+            for rotamer_id in residue_pair_matches:
+                matches.append((fuzz_anchor, fuzz_ball_anchor_rotamer_id, motif_res, target_seqpos, rotamer_id))
 
-    exit()
-
+    return matches
 
 def find_matched_rotamers_for_fuzz_ball(target_pose, target_anchor_seqpos, target_matching_seqposes,
         fuzz_pose, ligand_residue, motif_residues):
@@ -196,6 +199,9 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_anchor_seqpos, targe
     set_up_fold_tree_for_root_residue(fuzz_pose, ligand_residue)
 
     # Find the matches for each of the motif residues achored
+    
+    matches = []
+
 
     for fuzz_anchor in motif_residues:
 
@@ -205,12 +211,15 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_anchor_seqpos, targe
             set_inverse_rotamer(fuzz_pose, fuzz_anchor, rotamer_set[i])
             match_anchor_position(target_pose, target_anchor_seqpos, fuzz_pose, fuzz_anchor)
             
-            find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
-                fuzz_pose, ligand_residue, motif_residues, fuzz_anchor)
+            matches += find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
+                fuzz_pose, ligand_residue, motif_residues, fuzz_anchor, i)
             
-            fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
+            #fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
             
-    target_pose.dump_pdb('debug/target.pdb') ###DEBUG
+    #target_pose.dump_pdb('debug/target.pdb') ###DEBUG
+    
+    print matches ###DEBUG
+    return matches
 
 
 if __name__ == '__main__':
