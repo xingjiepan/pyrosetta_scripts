@@ -89,6 +89,49 @@ def match_anchor_position(target_pose, target_anchor_seqpos, movable_pose, movab
 
     movable_pose.apply_transform_Rx_plus_v(R, v) 
 
+def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose, motif_res, rmsd_cutoff=2):
+    '''Find all rotamers that matches the residue on the target pose to the motif residue.
+    
+    Return:
+        A list of rotamer ids.
+    '''
+    def side_chain_heavy_atom_xyzs(residue):
+        sc_heavy_atoms = list(range(residue.first_sidechain_atom(), residue.nheavyatoms() + 1))
+        return [residue.xyz(i) for i in sc_heavy_atoms]
+
+    def RMSD(xyzs1, xyzs2):
+        assert(len(xyzs1) == len(xyzs2))
+        diffs = [xyzs1[i] - xyzs2[i] for i in range(len(xyzs1))]
+        return np.sqrt(sum(d.length_squared() for d in diffs) / len(diffs))
+
+    def sc_heavy_atom_rmsd(residue1, residue2):
+        xyzs1 = side_chain_heavy_atom_xyzs(residue1)
+        xyzs2 = side_chain_heavy_atom_xyzs(residue2)
+        return RMSD(xyzs1, xyzs2)
+
+    # Muatet the target residue to the motif residue
+
+    mutater = rosetta.protocols.simple_moves.MutateResidue()
+    mutater.set_res_name(fuzz_pose.residue(motif_res).name3())
+    mutater.set_target(target_seqpos)
+    mutater.apply(target_pose)
+
+    # Test the rotamers
+
+    matched_rotamers = []
+
+    rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(motif_res).type(), True )
+        
+    for i in range(1, len(rotamer_set) + 1):
+        replace_intra_residue_torsions(target_pose, target_seqpos, rotamer_set[i])
+        if rmsd_cutoff > sc_heavy_atom_rmsd(target_pose.residue(target_seqpos), fuzz_pose.residue(motif_res)):
+            matched_rotamers.append(i)
+            #target_pose.dump_pdb('debug/target_matched_{0}_{1}_{2}.pdb'.format(target_seqpos, motif_res, i))###DEBUG
+            #fuzz_pose.dump_pdb('debug/fuzz_matched_{0}_{1}_{2}.pdb'.format(target_seqpos, motif_res, i))#DEBUG
+
+    return matched_rotamers
+
+
 def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
         fuzz_pose, ligand_residue, motif_residues, fuzz_anchor):
     '''Find all rotamers that could match the anchored fuzz ball to the target pose.
@@ -102,10 +145,34 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
         fuzz_anchor: The residue on the fuzz ball that is anchored to the target
 
     Return:
-        A list of matches defined as (fuzz_ball_anchor_residue, fuzz_ball_matched_residue, 
-            target_matched_residue, rotamer_id)
+        A list of matches defined as (fuzz_ball_anchor_residue, fuzz_ball_anchor_rotamer_id,
+            fuzz_ball_matched_residue, target_matched_residue, rotamer_id)
     '''
-    pass
+    def ca_nbr_distance(residue1, residue2):
+        '''Calculate the distance between the CA atom of residue1
+        and the NBR atom of residue2.
+        '''
+        return residue1.xyz('CA').distance(residue2.nbr_atom_xyz())
+
+    # Find matches for each motif residue
+
+    for motif_res in motif_residues:
+        if motif_res == fuzz_anchor: continue
+
+        # Find all matchable positions with in 5 angstrom
+
+        positions_to_test = [i for i in target_matching_seqposes 
+                if ca_nbr_distance(target_pose.residue(i), fuzz_pose.residue(motif_res)) < 5]
+
+        # Find all matches
+
+        for target_seqpos in positions_to_test:
+            find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose,
+                    motif_res)
+
+
+    exit()
+
 
 def find_matched_rotamers_for_fuzz_ball(target_pose, target_anchor_seqpos, target_matching_seqposes,
         fuzz_pose, ligand_residue, motif_residues):
@@ -120,8 +187,8 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_anchor_seqpos, targe
         motif_residues: A list of motif residues.
         
     Return:
-        A list of matches defined as (fuzz_ball_anchor_residue, fuzz_ball_matched_residue, 
-            target_matched_residue, rotamer_id)
+        A list of matches defined as (fuzz_ball_anchor_residue, fuzz_ball_anchor_rotamer_id,
+            fuzz_ball_matched_residue, target_matched_residue, rotamer_id)
     '''
    
     # Set up the fold tree that roots on the ligand residue
