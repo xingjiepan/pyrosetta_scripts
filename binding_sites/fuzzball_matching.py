@@ -89,6 +89,62 @@ def match_anchor_position(target_pose, target_anchor_seqpos, movable_pose, movab
 
     movable_pose.apply_transform_Rx_plus_v(R, v) 
 
+def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
+        fuzz_pose, ligand_residue, motif_residues, fuzz_anchor):
+    '''Find all rotamers that could match the anchored fuzz ball to the target pose.
+    Args:
+        target_pose: The target pose.
+        target_matching_seqposes: The residues on the target pose that are available for
+            motif matching.
+        fuzz_pose: The fuzz ball pose.
+        ligand_residue: The id of the ligand residue.
+        motif_residues: A list of motif residues.
+        fuzz_anchor: The residue on the fuzz ball that is anchored to the target
+
+    Return:
+        A list of matches defined as (fuzz_ball_anchor_residue, fuzz_ball_matched_residue, 
+            target_matched_residue, rotamer_id)
+    '''
+    pass
+
+def find_matched_rotamers_for_fuzz_ball(target_pose, target_anchor_seqpos, target_matching_seqposes,
+        fuzz_pose, ligand_residue, motif_residues):
+    '''Find all rotamers that could match the fuzz ball to the target pose.
+    Args:
+        target_pose: The target pose.
+        target_anchor_seqpos: The achor point on the target pose.
+        target_matching_seqposes: The residues on the target pose that are available for
+            motif matching.
+        fuzz_pose: The fuzz ball pose.
+        ligand_residue: The id of the ligand residue.
+        motif_residues: A list of motif residues.
+        
+    Return:
+        A list of matches defined as (fuzz_ball_anchor_residue, fuzz_ball_matched_residue, 
+            target_matched_residue, rotamer_id)
+    '''
+   
+    # Set up the fold tree that roots on the ligand residue
+
+    set_up_fold_tree_for_root_residue(fuzz_pose, ligand_residue)
+
+    # Find the matches for each of the motif residues achored
+
+    for fuzz_anchor in motif_residues:
+
+        rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(fuzz_anchor).type(), True )
+
+        for i in range(1, len(rotamer_set) + 1):
+            set_inverse_rotamer(fuzz_pose, fuzz_anchor, rotamer_set[i])
+            match_anchor_position(target_pose, target_anchor_seqpos, fuzz_pose, fuzz_anchor)
+            
+            find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
+                fuzz_pose, ligand_residue, motif_residues, fuzz_anchor)
+            
+            fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
+            
+    target_pose.dump_pdb('debug/target.pdb') ###DEBUG
+
 
 if __name__ == '__main__':
     pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params')
@@ -100,16 +156,7 @@ if __name__ == '__main__':
     rosetta.core.import_pose.pose_from_file(target_pose, 'inputs/2lvb_no_terms.pdb')
 
     #target_residues = list(range(3, 9)) + list(range(37, 50)) + list(range(63, 77))
-    target_anchor_seqpos = 6
 
+    find_matched_rotamers_for_fuzz_ball(target_pose, 6, list(range(37, 50)) + list(range(63, 77)),
+            fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)))
 
-    set_up_fold_tree_for_root_residue(fuzz_pose, 1)
-
-    rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(2).type(), True )
-
-    for i in range(1, len(rotamer_set) + 1):
-        set_inverse_rotamer(fuzz_pose, 2, rotamer_set[i])
-        match_anchor_position(target_pose, target_anchor_seqpos, fuzz_pose, 2)
-        fuzz_pose.dump_pdb('debug/test_fuzz_{0}.pdb'.format(i))
-        
-    target_pose.dump_pdb('debug/target.pdb')
