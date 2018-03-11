@@ -106,8 +106,11 @@ def set_up_fold_tree(pose, motif_residues, ligand_residue, ligand_anchor_atom, m
     if motif_anchor_atoms is None:
         motif_anchor_atoms = []
         for res in motif_residues:
+            print pose.residue(res).name3(), pose.residue(res).nchi() ###DEBUG
+            last_chi_atom = pose.residue(res).chi_atoms(pose.residue(res).nchi())[4]
+            motif_anchor_atoms.append(pose.residue(res).atom_name(last_chi_atom)) ###This also fails. The problem seems to come from the logic of defining stubs for atoms in the atom tree, which is complicated. Need a better way to generate inverse rotamers.
             #motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms())) ###This setting fails sometimes for unkonwn reason
-            motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms() - 2))
+            #motif_anchor_atoms.append(pose.residue(res).atom_name(pose.residue(res).nheavyatoms() - 2)) ###This is not correct
 
     for i, res in enumerate(motif_residues):
         ft.add_edge(ligand_residue, res, i + 1)
@@ -275,11 +278,11 @@ def dump_all_rotamers(pose, residue, ligand_residue):
     
     for i in range(len(rotamer_set)):
         replace_intra_residue_torsions(pose, residue, rotamer_set[i + 1])
-
+        print residue, pose.residue(residue).xyz('CA')###DEBUG
         local_pose = rosetta.core.pose.Pose() 
         rosetta.core.pose.pdbslice(local_pose, pose, seqposes)
         local_pose.pdb_info().obsolete(True)
-        local_pose.dump_pdb('debug/test.{0}.{1}.pdb'.format(residue, i + 1))
+        local_pose.dump_pdb('debug/helix.{0}.{1}.pdb'.format(residue, i + 1))
 
 
 if __name__ == '__main__':
@@ -288,7 +291,8 @@ if __name__ == '__main__':
 
     pose = rosetta.core.pose.Pose()
     #rosetta.core.import_pose.pose_from_file(pose, 'inputs/ke07_active_site.pdb')
-    rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james_renumbered.pdb')
+    rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james.pdb')
+    #rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james_renumbered.pdb')
     #rosetta.core.import_pose.pose_from_file(pose, 'inputs/binding_site_from_james_renumbered_small.pdb')
     remove_terminal_variants(pose)
 
@@ -299,7 +303,7 @@ if __name__ == '__main__':
     motif_residues, ligand_residue = insert_flanking_residues(pose, list(range(2, pose.size() + 1)), 1)
     set_up_fold_tree(pose, motif_residues, ligand_residue, 'C1')
     #find_parallel_sses(pose, motif_residues, ['E', 'H', 'H'])
-    set_sses(pose, motif_residues, ['H'] * (pose.size() - 1))
+    set_sses(pose, motif_residues, ['E'] * (pose.size() - 1))
 
     print pose.fold_tree()
 
