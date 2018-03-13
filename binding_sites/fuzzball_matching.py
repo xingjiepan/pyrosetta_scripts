@@ -394,11 +394,12 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
                
                 matches += matches_for_anchor
 
-                picked_matches = pick_lowest_rmsd_matches(matches_for_anchor)
-                
+                #picked_matches = pick_lowest_rmsd_matches(matches_for_anchor)
+                picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
+               
                 #print '\n'.join(str(m) for m in matches_for_anchor) + '\n'###DEBUG
-                #print '\n'.join(str(m) for m in picked_matches) + '\n'###DEBUG
-                if len(picked_matches) > 5:
+                print '\n'.join(str(m) for m in picked_matches) + '\n'###DEBUG
+                if len(picked_matches) > 4:
                     print fuzz_anchor, len(picked_matches)
                     dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches)
                     exit()
@@ -448,22 +449,12 @@ def pick_non_clashing_lowest_rmsd_matches(target_pose_original, fuzz_pose_origin
     
     # Mutate all residues on the target to ALA
     
-    mutater = rosetta.protocols.simple_moves.MutateResidue()
-    mutater.set_res_name('ALA')
-    for target_seqpos in range(1, target_pose.size() + 1):
-        mutater.set_target(target_seqpos)
-        mutater.apply(target_pose)
-
-    # Create a pseudo match for the anchor
-
-    anchor_match = Match()
-    anchor_match.target_matched_residue = matches[0].target_anchor_residue
-    anchor_match.fuzz_ball_matched_residue = matches[0].fuzz_ball_anchor_residue
-    anchor_match.target_matched_rotamer = matches[0].fuzz_ball_anchor_rotamer
+    mutate_residues(target_pose, range(1, target_pose.size() + 1), 'ALA')
 
     # Align the anchor
 
-    match_anchor_position(target_pose, anchor_match.target_matched_residue, fuzz_pose, anchor_match.fuzz_ball_matched_residue)
+    set_rotamer_and_match_anchor(target_pose, matches[0].target_anchor_residue, fuzz_pose,
+            matches[0].fuzz_ball_anchor_residue, matches[0].fuzz_ball_anchor_rotamer)
     
     # Find the compatible matched residues
 
@@ -471,9 +462,9 @@ def pick_non_clashing_lowest_rmsd_matches(target_pose_original, fuzz_pose_origin
     matched_fuzz_residues = [matches[0].fuzz_ball_anchor_residue]
     sorted_matches = sorted(matches, key=lambda m : m.match_rmsd)
 
-    for m in [anchor_match] + sorted_matches:
-        fuzz_res = match.fuzz_ball_matched_residue 
-        target_seqpos = match.target_matched_residue
+    for m in sorted_matches:
+        fuzz_res = m.fuzz_ball_matched_residue 
+        target_seqpos = m.target_matched_residue
         
         if target_seqpos in matched_target_residues:
             continue
@@ -482,19 +473,35 @@ def pick_non_clashing_lowest_rmsd_matches(target_pose_original, fuzz_pose_origin
 
         # Mutate the residue and apply the rotamer
 
-        rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(fuzz_res).type(), True )
-        
-        mutater.set_res_name(fuzz_pose.residue(fuzz_res).name3())
-        mutater.set_target(target_seqpos)
-        mutater.apply(target_pose)
-
-        replace_intra_residue_torsions(target_pose, target_seqpos, rotamer_set[match.target_matched_rotamer])
+        apply_match(target_pose, fuzz_pose, m)
 
         # Check clashes
+    
+        clash = intra_residue_heavy_atom_clash(target_pose.residue(target_seqpos))
+        
+        if residue_heavy_atom_clashes(fuzz_pose.residue(ligand_residue), target_pose.residue(target_seqpos)):
+            clash = True
+        
+        for res in range(1, target_pose.size()):
+            if res == target_seqpos: continue
 
-        picked_matches.append(m)
-        matched_target_residues.append(target_seqpos)
-        matched_fuzz_residues.append(fuzz_res)
+            if -1 <= target_seqpos - res <=1:
+                if residue_heavy_atom_clashes(target_pose.residue(target_seqpos), target_pose.residue(res), res1_bb=False):
+                    clash = True
+                    break
+
+            elif residue_heavy_atom_clashes(target_pose.residue(target_seqpos), target_pose.residue(res)):
+                clash = True
+                break
+
+        # Accept the non-clashing match
+
+        if clash:
+            mutate_residues(target_pose, [target_seqpos], 'ALA') 
+        else:
+            picked_matches.append(m)
+            matched_target_residues.append(target_seqpos)
+            matched_fuzz_residues.append(fuzz_res)
 
     return picked_matches 
 
