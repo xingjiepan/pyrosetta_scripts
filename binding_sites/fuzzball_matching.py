@@ -98,6 +98,9 @@ def set_inverse_rotamer(pose, seqpos, ref_residue):
     '''Set inverse rotamer at a position according by
     applying the torsions from the reference residue.
     '''
+    if pose.residue(seqpos).name3() == 'ALA' or pose.residue(seqpos).name3() == 'GLY':
+        return
+    
     # Update the rotamer
     
     last_chi = pose.residue(seqpos).chi_atoms(pose.residue(seqpos).nchi()) 
@@ -328,7 +331,7 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
             
             for target_anchor_seqpos in target_matching_seqposes:
                 match_anchor_position(target_pose, target_anchor_seqpos, fuzz_pose, fuzz_anchor)
-           
+          
                 if not anchor_is_good(target_pose, fuzz_pose, target_anchor_seqpos, fuzz_anchor, ligand_residue):
                     continue
 
@@ -341,11 +344,13 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
                 matches += matches_for_anchor
 
                 picked_matches = pick_lowest_rmsd_matches(matches_for_anchor)
+                
                 #print '\n'.join(str(m) for m in matches_for_anchor) + '\n'###DEBUG
-                print '\n'.join(str(m) for m in picked_matches) + '\n'###DEBUG
-                if len(picked_matches) > 5:
-                    dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches)
-                    exit()
+                #print '\n'.join(str(m) for m in picked_matches) + '\n'###DEBUG
+                print len(picked_matches)
+                #if len(picked_matches) > 5:
+                #    dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches)
+                #    exit()
                 #fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
                 #target_pose.dump_pdb('debug/target.pdb') ###DEBUG
 
@@ -357,6 +362,8 @@ def pick_lowest_rmsd_matches(matches):
     '''Find the subset of matches that don't share same
     motif/position and have lowest RMSDs.
     '''
+    if 0 == len(matches): return []
+
     picked_matches = []
 
     matched_target_residues = [matches[0].target_anchor_residue]
