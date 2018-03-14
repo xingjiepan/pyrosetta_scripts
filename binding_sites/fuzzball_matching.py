@@ -45,6 +45,34 @@ def clean_fuzz_pose(fuzz_pose, ligand_residue):
 
     return cleaned_pose
 
+def residue_residue_total_energy(pose, res1, res2):
+    '''Get the total interaction energy between two residues.'''
+    e_edge = pose.energies().energy_graph().find_energy_edge(res1, res2)
+
+    if e_edge:
+        return e_edge.dot(pose.energies().weights())
+    else:
+        return 0
+
+def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=-2):
+    '''Filter the motif residues by their interaction energy with
+    the ligand residue.
+    Return a new pose with the bad motifs filtered out.
+    '''
+    new_pose = rosetta.core.pose.Pose(fuzz_pose, ligand_residue, ligand_residue)
+    
+    sfxn = rosetta.core.scoring.get_score_function()
+   
+    sfxn(fuzz_pose)
+
+    for i in range(1, fuzz_pose.size() + 1):
+        if i == ligand_residue: continue
+            
+        if residue_residue_total_energy(fuzz_pose, ligand_residue, i) < energy_cutoff:
+            new_pose.append_residue_by_jump(fuzz_pose.residue(i).clone(), 1)
+
+    return new_pose
+
 def intra_residue_heavy_atom_clash(residue, cutoff_distance=2.5):
     '''Return true if there are clashes inside one residue.'''
     N = residue.nheavyatoms()
@@ -371,8 +399,8 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
     
     matches = []
 
-    #for fuzz_anchor in motif_residues:
-    for fuzz_anchor in [10]: ###DEBUG
+    for fuzz_anchor in motif_residues:
+    #for fuzz_anchor in [10]: ###DEBUG
 
         rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(fuzz_anchor).type(), True )
 
@@ -393,16 +421,21 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
                     m.fuzz_ball_anchor_rotamer = i
                
                 matches += matches_for_anchor
+        
+                print len(matches_for_anchor)
+                #if len(matches) > 8: 
+                #    picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
+                #    print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
+              
+                #    if len(picked_matches) > 5:
+                #        output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches) + 1, fuzz_anchor, i, target_anchor_seqpos))
 
-                #picked_matches = pick_lowest_rmsd_matches(matches_for_anchor)
-                picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
-               
-                #print '\n'.join(str(m) for m in matches_for_anchor) + '\n'###DEBUG
-                print '\n'.join(str(m) for m in picked_matches) + '\n'###DEBUG
-                if len(picked_matches) > 4:
-                    print fuzz_anchor, len(picked_matches)
-                    dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches)
-                    exit()
+                #        if not os.path.exists(output_path):
+                #            os.mkdir(output_path)
+
+                #        dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches,
+                #                os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
+
                 #fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
                 #target_pose.dump_pdb('debug/target.pdb') ###DEBUG
 
@@ -505,7 +538,8 @@ def pick_non_clashing_lowest_rmsd_matches(target_pose_original, fuzz_pose_origin
 
     return picked_matches 
 
-def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_residue, matches):
+def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_residue, matches,
+        target_output_file, matched_fuzz_output_file):
     '''Dump matches for an anchor.'''
     
     # Make copies of the poses
@@ -534,18 +568,20 @@ def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_
     for m in matches:
         matched_fuzz_pose.append_residue_by_jump(fuzz_pose.residue(m.fuzz_ball_matched_residue).clone(), 1)
 
-    target_pose.dump_pdb('debug/target_pose.pdb')
-    matched_fuzz_pose.dump_pdb('debug/matched_fuzz_pose.pdb')
+    target_pose.dump_pdb(target_output_file)
+    matched_fuzz_pose.dump_pdb(matched_fuzz_output_file)
 
 
 if __name__ == '__main__':
     pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params')
+    #pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params -mute all')
     
     fuzz_pose = rosetta.core.pose.Pose()
     #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_renumbered.pdb')
     rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all.pdb')
     #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all_cleaned.pdb')
     fuzz_pose = clean_fuzz_pose(fuzz_pose, 1)
+    fuzz_pose = filter_motif_residues(fuzz_pose, 1)
 
     #####OBSOLETE
     #target_pose = rosetta.core.pose.Pose()
@@ -559,6 +595,6 @@ if __name__ == '__main__':
     matchable_positions_pdb = [130, 80, 171, 101, 48, 23, 5, 7, 9, 201, 144, 169, 126, 128, 103, 225, 224, 222, 78, 55, 50, 52]
     matchable_positions = [target_pose.pdb_info().pdb2pose('B', i) for i in matchable_positions_pdb]
 
-    #fuzz_pose.dump_pdb('debug/test_fuzz.pdb') ###DEBUG
-    #print fuzz_pose.size() ###DEBUG
-    find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)))
+    fuzz_pose.dump_pdb('debug/test_fuzz.pdb') ###DEBUG
+    print fuzz_pose.size() ###DEBUG
+    #find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)))
