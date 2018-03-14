@@ -24,6 +24,52 @@ class Match:
     def __repr__(self):
         return str(self.__dict__)
 
+def get_bb_compatible_rotamers_for_pose(pose_original, positions, cutoff_repulsion_score=10):
+    '''Get the set of rotamers that are compatible with
+    the backbone of a given pose.
+    Return:
+        A dictionary with the format {position: {'AA':[rotamer_ids]}}
+    '''
+    def repulsion_score(pose):
+        return pose.energies().total_energies()[rosetta.core.scoring.fa_rep] 
+    
+    AAs = ['VAL', 'LEU', 'ILE', 'MET',
+           'PHE', 'TYR', 'TRP',
+           'SER', 'THR', 'CYS',
+           'ARG', 'LYS', 'HIS',
+           'ASP', 'GLU', 'ASN', 'GLN']
+
+    pose = pose_original.clone()
+    mutate_residues(pose, range(1, pose.size() + 1), 'ALA')
+   
+    sfxn = rosetta.core.scoring.get_score_function()
+    sfxn(pose)
+    ref_score = repulsion_score(pose)
+
+    bb_compatible_rotamers = {}
+
+    for seqpos in positions:
+        bb_compatible_rotamers[seqpos] = {'ALA':[], 'GLY':[], 'PRO':[]}
+
+        for aa in AAs:
+            bb_compatible_rotamers[seqpos][aa] = []
+            
+            mutate_residues(pose, [seqpos], aa, keep_g_p=False)
+            rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( pose.residue(seqpos).type(), True )
+
+            for i in range(1, len(rotamer_set) +1):
+                replace_intra_residue_torsions(pose, seqpos, rotamer_set[i])
+                sfxn(pose)
+                score_diff = repulsion_score(pose) - ref_score
+                #print seqpos, aa, i, score_diff
+
+                if score_diff < cutoff_repulsion_score:
+                    bb_compatible_rotamers[seqpos][aa].append(i)
+
+            mutate_residues(pose, [seqpos], 'ALA', keep_g_p=False)
+
+    return bb_compatible_rotamers
+
 def clean_fuzz_pose(fuzz_pose, ligand_residue):
     '''The fuzz pose might have a lot of residues that are
     nearly identical, remove the redundancy.
@@ -204,7 +250,7 @@ def mutate_residues(pose, residues, res_name, keep_g_p=True):
     mutater.set_res_name(res_name)
 
     for res in residues:
-        if keep_g_p and pose.residue(res).name3() in ['GLY', 'PRO']:
+        if keep_g_p and (pose.residue(res).name3() in ['GLY', 'PRO']):
             continue
         mutater.set_target(res)
         mutater.apply(pose)
@@ -325,7 +371,7 @@ def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pos
     matched_rotamers = []
 
     rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(motif_res).type(), True )
-        
+
     for i in range(1, len(rotamer_set) + 1):
         replace_intra_residue_torsions(target_pose, target_seqpos, rotamer_set[i])
         rmsd = sc_heavy_atom_rmsd(target_pose.residue(target_seqpos), fuzz_pose.residue(motif_res))
@@ -674,7 +720,9 @@ if __name__ == '__main__':
     rosetta.core.import_pose.pose_from_file(target_pose, 'inputs/3tdn_barrel.pdb')
     matchable_positions_pdb = [130, 80, 171, 101, 48, 23, 5, 7, 9, 201, 144, 169, 126, 128, 103, 225, 224, 222, 78, 55, 50, 52]
     matchable_positions = [target_pose.pdb_info().pdb2pose('B', i) for i in matchable_positions_pdb]
+    bb_compatible_rotamers = get_bb_compatible_rotamers_for_pose(target_pose, matchable_positions)
+    print bb_compatible_rotamers
 
     #fuzz_pose.dump_pdb('debug/test_fuzz.pdb') ###DEBUG
     #print fuzz_pose.size() ###DEBUG
-    find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)))
+    #find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)))
