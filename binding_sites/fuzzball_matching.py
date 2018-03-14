@@ -198,12 +198,14 @@ def match_anchor_position(target_pose, target_anchor_seqpos, movable_pose, movab
 
     movable_pose.apply_transform_Rx_plus_v(R, v) 
 
-def mutate_residues(pose, residues, res_name):
+def mutate_residues(pose, residues, res_name, keep_g_p=True):
     '''Mutate residues in a pose to a given type.'''
     mutater = rosetta.protocols.simple_moves.MutateResidue()
     mutater.set_res_name(res_name)
 
     for res in residues:
+        if keep_g_p and pose.residue(res).name3() in ['GLY', 'PRO']:
+            continue
         mutater.set_target(res)
         mutater.apply(pose)
 
@@ -437,6 +439,9 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
                     picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
                     print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
               
+                    get_scores_for_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)###DEBUG
+                    exit()###DEBUG
+                    
                     if len(picked_matches) > 3:
                         output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches) + 1, fuzz_anchor, i, target_anchor_seqpos))
 
@@ -549,6 +554,75 @@ def pick_non_clashing_lowest_rmsd_matches(target_pose_original, fuzz_pose_origin
             matched_target_residues.append(target_seqpos)
             matched_fuzz_residues.append(fuzz_res)
 
+    return picked_matches 
+
+def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, ligand_residue):
+    '''Get the scores for the matched residues.
+    Return:
+        M_scores: a matrix of of scores. The diagonal is the one body scores
+            of matches and the element M_scores[i][j] (j > i) is the interaction energy between
+            two matched residues. M_scores[i][j] = 0 when j < i.
+        matches_with_anchor: the maches with the anchor prepended
+    '''
+    # Make copies of the poses
+  
+    target_pose = target_pose_original.clone()
+    fuzz_pose = fuzz_pose_original.clone()
+    
+    # Mutate all residues on the target to ALA
+    
+    mutate_residues(target_pose, range(1, target_pose.size() + 1), 'ALA')
+
+    # Align the anchor and insert the ligand to the target pose
+
+    set_rotamer_and_match_anchor(target_pose, matches[0].target_anchor_residue, fuzz_pose,
+            matches[0].fuzz_ball_anchor_residue, matches[0].fuzz_ball_anchor_rotamer)
+    target_pose.append_residue_by_jump(fuzz_pose.residue(ligand_residue), 1)
+    
+    # Find the compatible matched residues
+
+    matches_with_anchor = [create_a_pseudo_match_for_anchor(matches[0])] + matches
+
+    # Set up scoring
+
+    sfxn = rosetta.core.scoring.get_score_function()
+    
+    sfxn(target_pose)
+    ref_score = target_pose.energies().total_energy()
+
+    M_scores = [[0 for j in range(len(matches_with_anchor))] for i in range(len(matches_with_anchor))] 
+
+    # Calculate all single residue scores
+   
+    for i in range(len(matches_with_anchor)):
+        apply_match(target_pose, fuzz_pose, matches_with_anchor[i])
+        
+        sfxn(target_pose)
+        M_scores[i][i] = target_pose.energies().total_energy() - ref_score
+   
+        mutate_residues(target_pose, [matches_with_anchor[i].target_matched_residue], 'ALA') 
+
+    # Calculate all pairwise residue scores
+
+    for i in range(len(matches_with_anchor)):
+        for j in range(i + 1, len(matches_with_anchor)):
+            apply_match(target_pose, fuzz_pose, matches_with_anchor[i])
+            apply_match(target_pose, fuzz_pose, matches_with_anchor[j])
+
+            sfxn(target_pose)
+            M_scores[i][j] = target_pose.energies().total_energy() - (ref_score + M_scores[i][i] + M_scores[j][j])
+
+            mutate_residues(target_pose, [matches_with_anchor[i].target_matched_residue], 'ALA') 
+            mutate_residues(target_pose, [matches_with_anchor[j].target_matched_residue], 'ALA') 
+    
+    return M_scores, matches_with_anchor
+
+def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, matches, ligand_residue):
+    '''Pick lowest score matches using a greedy algorithm.
+    '''
+    if 0 == len(matches): return []
+    picked_matches = []
+    
     return picked_matches 
 
 def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_residue, matches,
