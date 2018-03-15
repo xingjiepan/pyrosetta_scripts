@@ -353,7 +353,7 @@ def sc_heavy_atom_rmsd(residue1, residue2):
     xyzs2 = side_chain_heavy_atom_xyzs(residue2)
     return RMSD(xyzs1, xyzs2)
 
-def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose, motif_res, rmsd_cutoff=2):
+def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose, motif_res, allowed_rotamers, rmsd_cutoff=2):
     '''Find all rotamers that matches the residue on the target pose to the motif residue.
     
     Return:
@@ -372,7 +372,7 @@ def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pos
 
     rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(motif_res).type(), True )
 
-    for i in range(1, len(rotamer_set) + 1):
+    for i in allowed_rotamers:
         replace_intra_residue_torsions(target_pose, target_seqpos, rotamer_set[i])
         rmsd = sc_heavy_atom_rmsd(target_pose.residue(target_seqpos), fuzz_pose.residue(motif_res))
         if rmsd < rmsd_cutoff:
@@ -386,7 +386,7 @@ def find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pos
 
 
 def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
-        fuzz_pose, ligand_residue, motif_residues, fuzz_anchor):
+        fuzz_pose, ligand_residue, motif_residues, fuzz_anchor, bb_compatible_rotamers):
     '''Find all rotamers that could match the anchored fuzz ball to the target pose.
     Args:
         target_pose: The target pose.
@@ -396,6 +396,8 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
         ligand_residue: The id of the ligand residue.
         motif_residues: A list of motif residues.
         fuzz_anchor: The residue on the fuzz ball that is anchored to the target
+        bb_compatible_rotamers: The backbone compatible rotamer ids on the target pose
+            at each position
 
     Return:
         A list of Matches
@@ -422,7 +424,7 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
 
         for target_seqpos in positions_to_test:
             matched_rotamer = find_matched_rotamers_for_residue_pairs(target_pose, target_seqpos, fuzz_pose,
-                    motif_res)
+                    motif_res, bb_compatible_rotamers[target_seqpos][fuzz_pose.residue(motif_res).name3()])
             if matched_rotamer:
                 matches.append(Match())
                 
@@ -435,7 +437,7 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
     return matches
 
 def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
-        fuzz_pose, ligand_residue, motif_residues):
+        fuzz_pose, ligand_residue, motif_residues, bb_compatible_rotamers):
     '''Find all rotamers that could match the fuzz ball to the target pose.
     Args:
         target_pose: The target pose.
@@ -444,7 +446,9 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
         fuzz_pose: The fuzz ball pose.
         ligand_residue: The id of the ligand residue.
         motif_residues: A list of motif residues.
-        
+        bb_compatible_rotamers: The backbone compatible rotamer ids on the target pose
+            at each position
+
     Return:
         A list of lists for matches of each anchor.
     '''
@@ -462,41 +466,42 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
 
         rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(fuzz_anchor).type(), True )
 
-        for i in range(1, len(rotamer_set) + 1):
+        for target_anchor_seqpos in target_matching_seqposes:
             
-            set_inverse_rotamer(fuzz_pose, fuzz_anchor, rotamer_set[i])
+            for i in bb_compatible_rotamers[target_anchor_seqpos][fuzz_pose.residue(fuzz_anchor).name3()]:
+                
+                set_inverse_rotamer(fuzz_pose, fuzz_anchor, rotamer_set[i])
             
-            for target_anchor_seqpos in target_matching_seqposes:
                 match_anchor_position(target_pose, target_anchor_seqpos, fuzz_pose, fuzz_anchor)
           
                 if not anchor_is_good(target_pose, fuzz_pose, target_anchor_seqpos, fuzz_anchor, ligand_residue):
                     continue
 
                 matches_for_anchor = find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_seqposes,
-                    fuzz_pose, ligand_residue, motif_residues, fuzz_anchor)
+                    fuzz_pose, ligand_residue, motif_residues, fuzz_anchor, bb_compatible_rotamers)
                 for m in matches_for_anchor:
                     m.target_anchor_residue = target_anchor_seqpos 
                     m.fuzz_ball_anchor_rotamer = i
                
                 matches += matches_for_anchor
         
-                print len(matches_for_anchor)
+                #print len(matches_for_anchor)
                 if len(matches_for_anchor) > 8: 
                     picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
                     print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
               
-                    get_scores_for_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)###DEBUG
-                    exit()###DEBUG
-                    
-                    if len(picked_matches) > 3:
-                        output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches) + 1, fuzz_anchor, i, target_anchor_seqpos))
+                #    get_scores_for_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)###DEBUG
+                #    exit()###DEBUG
+                #    
+                    if len(picked_matches) > 2:
+                        output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches), fuzz_anchor, i, target_anchor_seqpos))
 
                         if not os.path.exists(output_path):
                             os.mkdir(output_path)
 
                         dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches,
                                 os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
-                        exit()###DEBUG
+                #        exit()###DEBUG
 
                 #fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
                 #target_pose.dump_pdb('debug/target.pdb') ###DEBUG
@@ -697,7 +702,6 @@ def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_
     # Extract the matched part of the fuzz pose
 
     matched_fuzz_pose = rosetta.core.pose.Pose(fuzz_pose, ligand_residue, ligand_residue)
-    matched_fuzz_pose.append_residue_by_jump(fuzz_pose.residue(matches[0].fuzz_ball_anchor_residue).clone(), 1)
     for m in matches:
         matched_fuzz_pose.append_residue_by_jump(fuzz_pose.residue(m.fuzz_ball_matched_residue).clone(), 1)
 
@@ -721,8 +725,8 @@ if __name__ == '__main__':
     matchable_positions_pdb = [130, 80, 171, 101, 48, 23, 5, 7, 9, 201, 144, 169, 126, 128, 103, 225, 224, 222, 78, 55, 50, 52]
     matchable_positions = [target_pose.pdb_info().pdb2pose('B', i) for i in matchable_positions_pdb]
     bb_compatible_rotamers = get_bb_compatible_rotamers_for_pose(target_pose, matchable_positions)
-    print bb_compatible_rotamers
+    #print bb_compatible_rotamers
 
     #fuzz_pose.dump_pdb('debug/test_fuzz.pdb') ###DEBUG
-    #print fuzz_pose.size() ###DEBUG
-    #find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)))
+    print "Number of motif residues =", fuzz_pose.size() ###DEBUG
+    find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)), bb_compatible_rotamers)
