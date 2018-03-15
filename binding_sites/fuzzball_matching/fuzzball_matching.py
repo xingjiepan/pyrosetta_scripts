@@ -158,31 +158,12 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
                 for m in matches_for_anchor:
                     m.target_anchor_residue = target_anchor_seqpos 
                     m.fuzz_ball_anchor_rotamer = i
-               
-                matches += matches_for_anchor
-        
-                print len(matches_for_anchor)
-                #if len(matches_for_anchor) > 8: 
-                #    #picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
-                #    picked_matches = pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
-                #    print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
               
-                #    
-                #    if len(picked_matches) > 4:
-                #        output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches), fuzz_anchor, i, target_anchor_seqpos))
+                if len(matches_for_anchor) > 0:
+                    matches.append(matches_for_anchor)
+        
+                #print len(matches_for_anchor)###DEBUG
 
-                #        if not os.path.exists(output_path):
-                #            os.mkdir(output_path)
-
-                #        dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches,
-                #                os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
-                #        exit()###DEBUG
-
-                #fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
-                #target_pose.dump_pdb('debug/target.pdb') ###DEBUG
-
-    
-    #print matches ###DEBUG
     return matches
 
 
@@ -193,11 +174,11 @@ if __name__ == '__main__':
    
     print 'Start preprocessing.'
 
-    fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose('test/inputs/fuzz_balls/REN_0001-single_pose.pdb', 1)
+    fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose('test/inputs/fuzz_balls_small/binding_site_from_james_renumbered.pdb', 1)
     
     target_pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(target_pose, 'test/inputs/target_pdbs/1svx.pdb')
-    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B')
+    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=9)
     bb_compatible_rotamers = preprocessing.get_bb_compatible_rotamers_for_pose(target_pose, matchable_positions)
 
     print 'Start matching.'

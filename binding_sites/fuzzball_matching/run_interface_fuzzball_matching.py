@@ -28,8 +28,10 @@ Options:
 '''
 
 import os
+import time
 
 import docopt
+import numpy as np
 
 import pyrosetta
 from pyrosetta import rosetta
@@ -39,8 +41,9 @@ import fuzzball_matching
 import pick_matches
 
 
-def match(fuzzball_pdb, target_pdb, ligand_id, output_path):
+def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=1):
     '''Find matches for a pair of target and fuzz ball.'''
+    # Load inputs
 
     fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose(fuzzball_pdb, ligand_id)
     motif_residues = [i for i in range(1, fuzz_pose.size() + 1) if i != ligand_id]
@@ -49,16 +52,39 @@ def match(fuzzball_pdb, target_pdb, ligand_id, output_path):
 
     target_pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(target_pose, target_pdb)
-    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=10)###DEBUG
+    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=9)###DEBUG
     #matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B')
     
     print 'The number of matchable positions is', len(matchable_positions)
     
     bb_compatible_rotamers = preprocessing.get_bb_compatible_rotamers_for_pose(target_pose, matchable_positions)
-    
+   
+    # Find matches
+
     print 'Start matching.'
 
-    fuzzball_matching.find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, ligand_id, motif_residues, bb_compatible_rotamers)
+    matches = fuzzball_matching.find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, ligand_id, motif_residues, bb_compatible_rotamers)
+
+    print 'Found {0} raw matches. The max of matched motifs is {1}'.format(len(matches), max(len(m) for m in matches))
+
+    # Pick matches
+
+    print 'Start picking matches.'
+
+    for match_id, matches_for_anchor in enumerate(matches):
+        
+        if len(matches_for_anchor) >= min_match_size: 
+            picked_matches = pick_matches.pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_id)
+            print len(picked_matches)
+            
+            if len(picked_matches) > min_match_size:
+                match_output_path = os.path.join(output_path, '{0}_{1}'.format(len(picked_matches), match_id))
+
+                if not os.path.exists(output_path):
+                    os.mkdir(output_path)
+
+                pick_matches.dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_id, picked_matches,
+                        os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
 
 
 if __name__ == '__main__':
@@ -100,5 +126,8 @@ if __name__ == '__main__':
     for i, job in enumerate(jobs):
         if i % int(arguments['--num_tasks']) == task_id:
             print 'Start job {0}/{1}.'.format(i, len(jobs))
+            start_time = time.time()
             match(job[0], job[1], int(arguments['--ligand_id']), job[2])
-            print 'Finish job {0}/{1}.'.format(i, len(jobs))
+            
+            end_time = time.time()
+            print 'Finish job {0}/{1} in {2} seconds.'.format(i, len(jobs), int(end_time - start_time))
