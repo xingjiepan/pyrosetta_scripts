@@ -80,6 +80,12 @@ def clean_fuzz_pose(fuzz_pose, ligand_residue):
     for i in range(1, fuzz_pose.size() + 1):    
         if i == ligand_residue: continue
 
+        # Discard all ALA, GLY and PRO
+
+        if fuzz_pose.residue(i).name3() in ['ALA', 'GLY', 'PRO']: continue
+
+        # Check redundancy
+
         redundant = False
         for j in range(2, cleaned_pose.size() + 1):
             if fuzz_pose.residue(i).name3() == cleaned_pose.residue(j).name3():
@@ -487,13 +493,12 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
         
                 #print len(matches_for_anchor)
                 if len(matches_for_anchor) > 8: 
-                    picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
+                    #picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
+                    picked_matches = pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
                     print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
               
-                #    get_scores_for_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)###DEBUG
-                #    exit()###DEBUG
-                #    
-                    if len(picked_matches) > 2:
+                    
+                    if len(picked_matches) > 4:
                         output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches), fuzz_anchor, i, target_anchor_seqpos))
 
                         if not os.path.exists(output_path):
@@ -611,8 +616,8 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
     '''Get the scores for the matched residues.
     Return:
         M_scores: a matrix of of scores. The diagonal is the one body scores
-            of matches and the element M_scores[i][j] (j > i) is the interaction energy between
-            two matched residues. M_scores[i][j] = 0 when j < i.
+            of matches and the element M_scores[i][j] (j != i) is the interaction energy between
+            two matched residues.
         matches_with_anchor: the maches with the anchor prepended
     '''
     # Make copies of the poses
@@ -650,31 +655,63 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
         
         sfxn(target_pose)
         M_scores[i][i] = target_pose.energies().total_energy() - ref_score
-   
+
         mutate_residues(target_pose, [matches_with_anchor[i].target_matched_residue], 'ALA') 
 
     # Calculate all pairwise residue scores
 
     for i in range(len(matches_with_anchor)):
         for j in range(i + 1, len(matches_with_anchor)):
+            if matches_with_anchor[i].target_matched_residue == matches_with_anchor[j].target_matched_residue:
+                M_scores[i][j] = 99999 # Set the interaction energy to 'infinity' if two matches have the same position
+                M_scores[j][i] = M_scores[i][j]
+                continue
+            
             apply_match(target_pose, fuzz_pose, matches_with_anchor[i])
             apply_match(target_pose, fuzz_pose, matches_with_anchor[j])
 
             sfxn(target_pose)
             M_scores[i][j] = target_pose.energies().total_energy() - (ref_score + M_scores[i][i] + M_scores[j][j])
+            M_scores[j][i] = M_scores[i][j]
 
             mutate_residues(target_pose, [matches_with_anchor[i].target_matched_residue], 'ALA') 
             mutate_residues(target_pose, [matches_with_anchor[j].target_matched_residue], 'ALA') 
     
     return M_scores, matches_with_anchor
 
-def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, matches, ligand_residue):
+def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, matches, ligand_residue, cutoff_score=10):
     '''Pick lowest score matches using a greedy algorithm.
     '''
+    def score_change_after_adding_match(M_scores, accepted_match_ids, new_id):
+        '''Return the score change after adding a match.'''
+        if new_id in accepted_match_ids: return float('inf')
+        
+        change = M_scores[new_id][new_id] 
+        for i in accepted_match_ids:
+            change += M_scores[i][new_id]
+
+        return change
+
     if 0 == len(matches): return []
-    picked_matches = []
-    
-    return picked_matches 
+   
+    M_scores, matches_with_anchor = get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, ligand_residue)
+
+    accepted_match_ids = []
+    for i in range(len(matches_with_anchor)):
+
+        # Find the best match to add
+
+        score_changes = [(j, score_change_after_adding_match(M_scores, accepted_match_ids, j))
+                for j in range(len(matches_with_anchor))]
+
+        best_match = min(score_changes, key=lambda x : x[1])
+
+        if best_match[1] > cutoff_score:
+            break
+
+        accepted_match_ids.append(best_match[0])
+
+    return [matches_with_anchor[i] for i in accepted_match_ids]
 
 def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_residue, matches,
         target_output_file, matched_fuzz_output_file):
@@ -716,7 +753,8 @@ if __name__ == '__main__':
     fuzz_pose = rosetta.core.pose.Pose()
     #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_renumbered.pdb')
     #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all.pdb')
-    rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all_cleaned.pdb')
+    #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all_cleaned.pdb')
+    rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/all_REN_fuzzballs/REN_0001-single_pose.pdb')
     fuzz_pose = clean_fuzz_pose(fuzz_pose, 1)
     fuzz_pose = filter_motif_residues(fuzz_pose, 1)
 
@@ -728,5 +766,5 @@ if __name__ == '__main__':
     #print bb_compatible_rotamers
 
     #fuzz_pose.dump_pdb('debug/test_fuzz.pdb') ###DEBUG
-    print "Number of motif residues =", fuzz_pose.size() ###DEBUG
+    #print "Number of motif residues =", fuzz_pose.size() ###DEBUG
     find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)), bb_compatible_rotamers)
