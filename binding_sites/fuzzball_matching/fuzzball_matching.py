@@ -189,21 +189,6 @@ if __name__ == '__main__':
     #pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params')
     pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params -mute all')
     
-    fuzz_pose = rosetta.core.pose.Pose()
-    #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_renumbered.pdb')
-    #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all.pdb')
-    #rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/binding_site_from_james_all_cleaned.pdb')
-    rosetta.core.import_pose.pose_from_file(fuzz_pose, 'inputs/all_REN_fuzzballs/REN_0001-single_pose.pdb')
-    fuzz_pose = clean_fuzz_pose(fuzz_pose, 1)
-    fuzz_pose = filter_motif_residues(fuzz_pose, 1)
 
-    target_pose = rosetta.core.pose.Pose()
-    rosetta.core.import_pose.pose_from_file(target_pose, 'inputs/3tdn_barrel.pdb')
-    matchable_positions_pdb = [130, 80, 171, 101, 48, 23, 5, 7, 9, 201, 144, 169, 126, 128, 103, 225, 224, 222, 78, 55, 50, 52]
-    matchable_positions = [target_pose.pdb_info().pdb2pose('B', i) for i in matchable_positions_pdb]
-    bb_compatible_rotamers = get_bb_compatible_rotamers_for_pose(target_pose, matchable_positions)
-    #print bb_compatible_rotamers
 
-    #fuzz_pose.dump_pdb('debug/test_fuzz.pdb') ###DEBUG
-    #print "Number of motif residues =", fuzz_pose.size() ###DEBUG
     find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)), bb_compatible_rotamers)

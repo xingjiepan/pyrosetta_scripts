@@ -2,6 +2,8 @@
 '''Basic classes and  functions for fuzzball matching.
 '''
 
+import numpy as np
+
 import pyrosetta
 from pyrosetta import rosetta
 
