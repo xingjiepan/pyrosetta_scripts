@@ -7,6 +7,8 @@ import numpy as np
 import pyrosetta
 from pyrosetta import rosetta
 
+from fuzzball_matching_basic import *
+
 
 def anchor_is_good(target_pose, fuzz_pose, target_anchor, fuzz_anchor, ligand_residue):
     '''Return true if an anchor is good.'''
@@ -137,7 +139,6 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
     matches = []
 
     for fuzz_anchor in motif_residues:
-    #for fuzz_anchor in [10]: ###DEBUG
 
         rotamer_set = rosetta.core.pack.rotamer_set.bb_independent_rotamers( fuzz_pose.residue(fuzz_anchor).type(), True )
 
@@ -160,21 +161,21 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
                
                 matches += matches_for_anchor
         
-                #print len(matches_for_anchor)
-                if len(matches_for_anchor) > 8: 
-                    #picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
-                    picked_matches = pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
-                    print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
+                print len(matches_for_anchor)
+                #if len(matches_for_anchor) > 8: 
+                #    #picked_matches = pick_non_clashing_lowest_rmsd_matches(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
+                #    picked_matches = pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_residue)
+                #    print fuzz_anchor, i, target_anchor_seqpos, len(picked_matches)
               
-                    
-                    if len(picked_matches) > 4:
-                        output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches), fuzz_anchor, i, target_anchor_seqpos))
+                #    
+                #    if len(picked_matches) > 4:
+                #        output_path = os.path.join('debug', '{0}_{1}_{2}_{3}'.format(len(picked_matches), fuzz_anchor, i, target_anchor_seqpos))
 
-                        if not os.path.exists(output_path):
-                            os.mkdir(output_path)
+                #        if not os.path.exists(output_path):
+                #            os.mkdir(output_path)
 
-                        dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches,
-                                os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
+                #        dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_residue, picked_matches,
+                #                os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
                 #        exit()###DEBUG
 
                 #fuzz_pose.dump_pdb('debug/test_fuzz_{0}_{1}.pdb'.format(fuzz_anchor, i)) ###DEBUG
@@ -186,9 +187,19 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
 
 
 if __name__ == '__main__':
-    #pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params')
-    pyrosetta.init(options='-extra_res_fa inputs/REN_no_charge_from_mol2.params -mute all')
+    import preprocessing
     
+    pyrosetta.init(options='-extra_res_fa test/inputs/REN_no_charge_from_mol2.params -mute all')
+   
+    print 'Start preprocessing.'
 
+    fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose('test/inputs/fuzz_balls/REN_0001-single_pose.pdb', 1)
+    
+    target_pose = rosetta.core.pose.Pose()
+    rosetta.core.import_pose.pose_from_file(target_pose, 'test/inputs/target_pdbs/1svx.pdb')
+    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B')
+    bb_compatible_rotamers = preprocessing.get_bb_compatible_rotamers_for_pose(target_pose, matchable_positions)
+
+    print 'Start matching.'
 
     find_matched_rotamers_for_fuzz_ball(target_pose, matchable_positions, fuzz_pose, 1, list(range(2, fuzz_pose.size() + 1)), bb_compatible_rotamers)

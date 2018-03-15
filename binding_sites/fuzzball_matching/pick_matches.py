@@ -3,6 +3,8 @@
 import pyrosetta
 from pyrosetta import rosetta
 
+from fuzzball_matching_basic import *
+
 
 def pick_lowest_rmsd_matches(matches):
     '''Find the subset of matches that don't share same

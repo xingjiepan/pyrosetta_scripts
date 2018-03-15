@@ -163,7 +163,7 @@ def print_pymol_selection_for_residues(pose, residues):
 if __name__ == '__main__':
     pyrosetta.init(options='-extra_res_fa test/inputs/REN_no_charge_from_mol2.params')
 
-    #fuzz_pose = load_cleaned_filtered_fuzz_pose('test/inputs/REN_0001-single_pose.pdb', 1)
+    #fuzz_pose = load_cleaned_filtered_fuzz_pose('test/inputs/fuzz_balls/REN_0001-single_pose.pdb', 1)
     #print "Number of motif residues =", fuzz_pose.size()
     #fuzz_pose.dump_pdb('test/outputs/cleaned_filtered_fuzz_pose.pdb')
 
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     #print bb_compatible_rotamers
 
     target_pose = rosetta.core.pose.Pose()
-    rosetta.core.import_pose.pose_from_file(target_pose, 'test/inputs/1svx.pdb')
+    rosetta.core.import_pose.pose_from_file(target_pose, 'test/inputs/target_pdbs/1svx.pdb')
 
     matchable_positions = find_interface_seqposes_noGP(target_pose, 'A', 'B')
     print_pymol_selection_for_residues(target_pose, matchable_positions)
