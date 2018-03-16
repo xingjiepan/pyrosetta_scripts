@@ -120,7 +120,7 @@ if __name__ == '__main__':
         for tf in os.listdir(target_pdb_dir):
             if not tf.endswith('.pdb'): continue
          
-            job_output_dir = os.path.join(arguments['--output_dir'], ff[:-4] + '_' + tf[:-4])
+            job_output_dir = os.path.join(arguments['--output_dir'], tf[:-4] + '_' + ff[:-4])
 
             try:
                 os.mkdir(job_output_dir)
