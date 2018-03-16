@@ -105,7 +105,7 @@ if __name__ == '__main__':
     except KeyError:
         task_id = 0
 
-    pyrosetta.init(options='-extra_res_fa {0} -mute all'.format(arguments['--params_file']))
+    pyrosetta.init(options='-extra_res_fa {0} -ignore_unrecognized_res true -mute all'.format(arguments['--params_file']))
 
     # Get the tuples of (fuzzball_pdb, target_pdb, output_path)
 
