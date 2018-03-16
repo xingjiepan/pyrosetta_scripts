@@ -1,4 +1,12 @@
 #!/usr/bin/env python2.7
+#$ -S /netapp/home/xingjiepan/.local/bin/python3  #-- the shell for the job                                                                                                          
+#$ -cwd                            #-- tell the job that it should start in your working directory
+#$ -r y                            #-- tell the system that if a job crashes, it should be restarted
+#$ -l mem_free=3G                  #-- submits on nodes with enough free memory (required)
+#$ -l arch=linux-x64               #-- SGE resources (CPU type)
+#$ -l netapp=1G,scratch=1G         #-- SGE resources (home and scratch disks)
+#$ -l h_rt=1:00:00                 #-- runtime limit 
+
 '''
 Match a set of fuzz balls to a target interface.
 Note that the interface should between chain A and chain B
@@ -41,7 +49,7 @@ import fuzzball_matching
 import pick_matches
 
 
-def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=1):
+def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=5):
     '''Find matches for a pair of target and fuzz ball.'''
     # Load inputs
 
@@ -52,8 +60,8 @@ def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=1):
 
     target_pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(target_pose, target_pdb)
-    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=9)###DEBUG
-    #matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B')
+    #matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=9)###DEBUG
+    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B')
     
     print 'The number of matchable positions is', len(matchable_positions)
     
@@ -72,19 +80,21 @@ def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=1):
     print 'Start picking matches.'
 
     for match_id, matches_for_anchor in enumerate(matches):
-        
-        if len(matches_for_anchor) >= min_match_size: 
+       
+        # Only construct binding sites from the raw matches with more than min_match_size * 1.5 matches
+
+        if len(matches_for_anchor) >= min_match_size * 1.5: 
             picked_matches = pick_matches.pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_id)
             print len(picked_matches)
             
-            if len(picked_matches) > min_match_size:
+            if len(picked_matches) >= min_match_size:
                 match_output_path = os.path.join(output_path, '{0}_{1}'.format(len(picked_matches), match_id))
 
-                if not os.path.exists(output_path):
-                    os.mkdir(output_path)
+                if not os.path.exists(match_output_path):
+                    os.mkdir(match_output_path)
 
                 pick_matches.dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_id, picked_matches,
-                        os.path.join(output_path, 'target_pose.pdb'), os.path.join(output_path, 'matched_fuzz_pose.pdb'))
+                        os.path.join(match_output_path, 'target_pose.pdb'), os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
 
 
 if __name__ == '__main__':
