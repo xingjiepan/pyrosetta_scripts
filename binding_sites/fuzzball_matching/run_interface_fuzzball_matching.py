@@ -13,7 +13,7 @@ Note that the interface should between chain A and chain B
 in the target pdb.
 
 Usage:
-    ./run_jobs.py -f=<FBD> -t=<TPD> -p=<PF> -l=<LI> -o=<OD> -n=<NT>
+    ./run_jobs.py -f=<FBD> -t=<TPD> -p=<PF> -l=<LI> -o=<OD> -n=<NT> [--run_test]
 
 Options:
     --fuzz_ball_dir=<FBD>, -f=<FBD>
@@ -33,6 +33,9 @@ Options:
 
     --num_tasks=<NT>, -n=<NT>
         Number of jobs for parallel run.
+
+    --run_test
+        Run as a test job.
 '''
 
 import os
@@ -49,7 +52,7 @@ import fuzzball_matching
 import pick_matches
 
 
-def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=5):
+def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=5, cutoff_distance=15):
     '''Find matches for a pair of target and fuzz ball.'''
     # Load inputs
 
@@ -60,8 +63,7 @@ def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=5):
 
     target_pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(target_pose, target_pdb)
-    #matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=9)###DEBUG
-    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B')
+    matchable_positions = preprocessing.find_interface_seqposes_noGP(target_pose, 'A', 'B', cutoff_distance=cutoff_distance)
     
     print 'The number of matchable positions is', len(matchable_positions)
     
@@ -137,7 +139,11 @@ if __name__ == '__main__':
         if i % int(arguments['--num_tasks']) == task_id:
             print 'Start job {0}/{1}.'.format(i, len(jobs))
             start_time = time.time()
-            match(job[0], job[1], int(arguments['--ligand_id']), job[2])
+            
+            if arguments['--run_test']:
+                match(job[0], job[1], int(arguments['--ligand_id']), job[2], min_match_size=1, cutoff_distance=9)
+            else:
+                match(job[0], job[1], int(arguments['--ligand_id']), job[2])
             
             end_time = time.time()
             print 'Finish job {0}/{1} in {2} seconds.'.format(i, len(jobs), int(end_time - start_time))
