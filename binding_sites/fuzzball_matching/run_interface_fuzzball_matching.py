@@ -57,6 +57,7 @@ def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=5, cu
     # Load inputs
 
     fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose(fuzzball_pdb, ligand_id)
+    ligand_id = 1 #Ligand id will be 1 after cleaning
     motif_residues = [i for i in range(1, fuzz_pose.size() + 1) if i != ligand_id]
     
     print 'The size of the fuzzball is', fuzz_pose.size()

@@ -79,7 +79,7 @@ def clean_fuzz_pose(fuzz_pose, ligand_residue):
 
     return cleaned_pose
 
-def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=-2):
+def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=None, number_cutoff=200):
     '''Filter the motif residues by their interaction energy with
     the ligand residue.
     Return a new pose with the bad motifs filtered out.
@@ -87,15 +87,41 @@ def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=-2):
     new_pose = rosetta.core.pose.Pose(fuzz_pose, ligand_residue, ligand_residue)
     
     sfxn = rosetta.core.scoring.get_score_function()
-   
     sfxn(fuzz_pose)
+
+    # Get the interaction energies
+
+    ligand_motif_energies = []
 
     for i in range(1, fuzz_pose.size() + 1):
         if i == ligand_residue: continue
             
-        if residue_residue_total_energy(fuzz_pose, ligand_residue, i) < energy_cutoff:
-            new_pose.append_residue_by_jump(fuzz_pose.residue(i).clone(), 1)
+        ligand_motif_energies.append((i, residue_residue_total_energy(fuzz_pose, ligand_residue, i)))
+           
+    ligand_motif_energies = sorted(ligand_motif_energies, key=lambda x : x[1])
 
+    # Print enegy distribution
+    
+    e_ranges = [(float('-inf'), -3), (-3, -2), (-2, -1), (-1, 0), (0, 1), (1, 10), (10, float('inf'))]
+
+    for e_r in e_ranges:
+        print 'Found {0} motif residues in the interaction energy range {1}'.format(
+                len(list(e for e in ligand_motif_energies if e_r[0] <= e[1] < e_r[1])), e_r)
+
+    # Select low energy motifs
+
+    selected_motifs = []
+
+    if energy_cutoff is not None:
+        for e in ligand_motif_energies:
+            if e[1] < energy_cutoff:
+                selected_motifs.append(e)
+    else:
+        selected_motifs = ligand_motif_energies
+
+    for e in selected_motifs[:number_cutoff]:        
+        new_pose.append_residue_by_jump(fuzz_pose.residue(e[0]).clone(), 1)
+    
     return new_pose
 
 def load_cleaned_filtered_fuzz_pose(pdb_file, ligand_id):
@@ -107,7 +133,7 @@ def load_cleaned_filtered_fuzz_pose(pdb_file, ligand_id):
     rosetta.core.import_pose.pose_from_file(fuzz_pose, pdb_file)
     
     fuzz_pose = clean_fuzz_pose(fuzz_pose, ligand_id)
-    fuzz_pose = filter_motif_residues(fuzz_pose, ligand_id)
+    fuzz_pose = filter_motif_residues(fuzz_pose, 1)
 
     return fuzz_pose
 
