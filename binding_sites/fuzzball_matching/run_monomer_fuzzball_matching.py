@@ -5,7 +5,7 @@
 #$ -l mem_free=3G                  #-- submits on nodes with enough free memory (required)
 #$ -l arch=linux-x64               #-- SGE resources (CPU type)
 #$ -l netapp=1G,scratch=1G         #-- SGE resources (home and scratch disks)
-#$ -l h_rt=1:00:00                 #-- runtime limit 
+#$ -l h_rt=48:00:00                #-- runtime limit 
 
 '''
 Match a set of fuzz balls to a target monomer.
@@ -153,6 +153,7 @@ if __name__ == '__main__':
     for i, job in enumerate(jobs):
         if i % int(arguments['--num_tasks']) == task_id:
             print 'Start job {0}/{1}.'.format(i, len(jobs))
+            print 'Job defined as', job
             start_time = time.time()
            
             if arguments['--run_test']:
