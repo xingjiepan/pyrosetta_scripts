@@ -21,6 +21,8 @@ class Match:
 
         self.match_rmsd = 999
 
+        self.hbond_match = False
+
     def __repr__(self):
         return str(self.__dict__)
 
@@ -62,6 +64,22 @@ def residue_heavy_atom_clashes(residue1, residue2, cutoff_distance=2.5,
                 return True
 
     return False
+
+def residue_residue_total_energy(pose, res1, res2):
+    '''Get the total interaction energy between two residues.'''
+    e_edge = pose.energies().energy_graph().find_energy_edge(res1, res2)
+
+    if e_edge:
+        return e_edge.dot(pose.energies().weights())
+    else:
+        return 0
+
+def residue_residue_hbond_energy(pose, res1, res2):
+    '''Get the H-bond energy between two residues.'''
+    e_edge = pose.energies().energy_graph().find_energy_edge(res1, res2)
+    e_map = e_edge.fill_energy_map()
+
+    return e_map[rosetta.core.scoring.hbond_sc]
 
 def mutate_residues(pose, residues, res_name, keep_g_p=True):
     '''Mutate residues in a pose to a given type.'''

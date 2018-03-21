@@ -79,15 +79,6 @@ def clean_fuzz_pose(fuzz_pose, ligand_residue):
 
     return cleaned_pose
 
-def residue_residue_total_energy(pose, res1, res2):
-    '''Get the total interaction energy between two residues.'''
-    e_edge = pose.energies().energy_graph().find_energy_edge(res1, res2)
-
-    if e_edge:
-        return e_edge.dot(pose.energies().weights())
-    else:
-        return 0
-
 def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=-2):
     '''Filter the motif residues by their interaction energy with
     the ligand residue.
