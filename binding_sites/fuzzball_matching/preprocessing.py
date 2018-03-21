@@ -144,6 +144,16 @@ def find_interface_seqposes_noGP(pose, chain1, chain2, cutoff_distance=15):
 
     return list(interface_residues)
 
+def load_matchable_positions_from_pos_file(target_pose, pos_file):
+    '''Load matchable positions from a pos file.
+    Ignore all GLY and PRO.
+    '''
+    with open(pos_file, 'r') as f:
+        raw_positions = [int(p) for p in f.read().split()]
+    
+    return [p for p in raw_positions
+            if not target_pose.residue(p).name3() in ['GLY', 'PRO']]
+
 def print_pymol_selection_for_residues(pose, residues):
     '''Print the pymol selection command for the residues.'''
     res_commands = ['(c. {0} and res {1})'.format(pose.pdb_info().chain(i), pose.pdb_info().number(i))
