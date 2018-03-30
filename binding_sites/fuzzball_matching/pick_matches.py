@@ -219,7 +219,7 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
     return M_scores, ligand_interaction_scores, matches_with_anchor, match_ids_problematic
 
 def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, matches, ligand_residue,
-        cutoff_score=10, min_hbond_match=1, ligand_interaction_score_cutoff=0):
+        cutoff_score=10, min_hbond_match=1, ligand_interaction_score_cutoff=-6):
     '''Pick lowest score matches using a greedy algorithm.
     Reject the binding site if the number of hbond matches
     is smaller than the min_hbond_match value.
