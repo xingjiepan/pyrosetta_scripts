@@ -79,7 +79,7 @@ def clean_fuzz_pose(fuzz_pose, ligand_residue):
 
     return cleaned_pose
 
-def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=None, number_cutoff=200):
+def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=None, number_cutoff=50):
     '''Filter the motif residues by their interaction energy with
     the ligand residue.
     Return a new pose with the bad motifs filtered out.
@@ -124,7 +124,7 @@ def filter_motif_residues(fuzz_pose, ligand_residue, energy_cutoff=None, number_
     
     return new_pose
 
-def load_cleaned_filtered_fuzz_pose(pdb_file, ligand_id):
+def load_cleaned_filtered_fuzz_pose(pdb_file, ligand_id, number_cutoff=50):
     '''Load a fuzz pose from a pdb file. Clean it and
     filter out bad motifs.
     Return the pose.
@@ -133,7 +133,7 @@ def load_cleaned_filtered_fuzz_pose(pdb_file, ligand_id):
     rosetta.core.import_pose.pose_from_file(fuzz_pose, pdb_file)
     
     fuzz_pose = clean_fuzz_pose(fuzz_pose, ligand_id)
-    fuzz_pose = filter_motif_residues(fuzz_pose, 1)
+    fuzz_pose = filter_motif_residues(fuzz_pose, 1, number_cutoff=number_cutoff)
 
     return fuzz_pose
 

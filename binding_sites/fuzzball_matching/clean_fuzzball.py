@@ -20,7 +20,7 @@ if __name__ == '__main__':
     pyrosetta.init(options='-extra_res_fa {0}'.format(ligand_params_file))
 
     fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose(
-            fuzzball_pdb, ligand_id)
+            fuzzball_pdb, ligand_id, number_cutoff=50)
 
     print "Number of motif residues =", fuzz_pose.size() - 1
 
