@@ -127,8 +127,11 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
         M_scores: a matrix of of scores. The diagonal is the one body scores
             of matches and the element M_scores[i][j] (j != i) is the interaction energy between
             two matched residues.
+        ligand_interaction_scores: a list of the total residue-residue scores between a
+            residue and the ligand
         matches_with_anchor: the maches with the anchor prepended
-        match_ids_break_hbonds: the list of matches that breaks H-bonds
+        match_ids_problematic: the list of matches that breaks H-bonds or have ligand
+            interaction energy above -1
     '''
     # Make copies of the poses
   
@@ -157,7 +160,8 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
     ref_score = target_pose.energies().total_energy()
 
     M_scores = [[0 for j in range(len(matches_with_anchor))] for i in range(len(matches_with_anchor))] 
-    match_ids_break_hbonds = []
+    ligand_interaction_scores = []
+    match_ids_problematic = []
 
     # Calculate all single residue scores
    
@@ -166,12 +170,20 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
         
         sfxn(target_pose)
         M_scores[i][i] = target_pose.energies().total_energy() - ref_score
+        
+        # Check if the match has good ligand interaction energy
+        
+        ligand_interaction_scores.append(residue_residue_total_energy(target_pose,
+            matches_with_anchor[i].target_matched_residue, target_pose.size()))
+
+        if ligand_interaction_scores[-1] > -1:
+            match_ids_problematic.append(i)
 
         # Check if the match breaks hbonds
 
-        if not h_bond_maintained(target_pose, matches_with_anchor[i].target_matched_residue, target_pose.size(),
+        elif not h_bond_maintained(target_pose, matches_with_anchor[i].target_matched_residue, target_pose.size(),
                 fuzz_pose, matches_with_anchor[i].fuzz_ball_matched_residue, ligand_residue, cutoff_ratio=0.5):
-            match_ids_break_hbonds.append(i)
+            match_ids_problematic.append(i)
 
         # Set check if the match has a hbond interaction
 
@@ -184,7 +196,11 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
     # Calculate all pairwise residue scores
 
     for i in range(len(matches_with_anchor)):
+        if i in match_ids_problematic: continue
+
         for j in range(i + 1, len(matches_with_anchor)):
+            if j in match_ids_problematic: continue
+            
             if matches_with_anchor[i].target_matched_residue == matches_with_anchor[j].target_matched_residue:
                 M_scores[i][j] = 99999 # Set the interaction energy to 'infinity' if two matches have the same position
                 M_scores[j][i] = M_scores[i][j]
@@ -200,18 +216,24 @@ def get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, li
             mutate_residues(target_pose, [matches_with_anchor[i].target_matched_residue], 'ALA') 
             mutate_residues(target_pose, [matches_with_anchor[j].target_matched_residue], 'ALA') 
     
-    return M_scores, matches_with_anchor, match_ids_break_hbonds
+    return M_scores, ligand_interaction_scores, matches_with_anchor, match_ids_problematic
 
-def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, matches, ligand_residue, cutoff_score=10, min_hbond_match=1):
+def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, matches, ligand_residue,
+        cutoff_score=10, min_hbond_match=1, ligand_interaction_score_cutoff=0):
     '''Pick lowest score matches using a greedy algorithm.
     Reject the binding site if the number of hbond matches
     is smaller than the min_hbond_match value.
+    Reject the binding site if the total interaction energy
+    betwen the ligand and motif residues are above the
+    ligand_interaction_score_cutoff.
+
+    Return the picked matches and the total_ligand_interaction_score
     '''
-    def score_change_after_adding_match(M_scores, accepted_match_ids, new_id, match_ids_break_hbonds):
+    def score_change_after_adding_match(M_scores, accepted_match_ids, new_id, match_ids_problematic):
         '''Return the score change after adding a match.
         If a match breaks hbonds, reject it.
         '''
-        if new_id in accepted_match_ids + match_ids_break_hbonds:
+        if new_id in accepted_match_ids + match_ids_problematic:
             return float('inf')
 
         change = M_scores[new_id][new_id] 
@@ -220,16 +242,18 @@ def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, m
 
         return change
 
-    if 0 == len(matches): return []
+    if 0 == len(matches): return [], 0
    
-    M_scores, matches_with_anchor, match_ids_break_hbonds = get_scores_for_matches(target_pose_original, fuzz_pose_original, matches, ligand_residue)
+    M_scores, ligand_interaction_scores, matches_with_anchor, match_ids_problematic = get_scores_for_matches(
+            target_pose_original, fuzz_pose_original, matches, ligand_residue)
+    total_ligand_interaction_score = 0
 
     accepted_match_ids = []
     for i in range(len(matches_with_anchor)):
 
         # Find the best match to add
 
-        score_changes = [(j, score_change_after_adding_match(M_scores, accepted_match_ids, j, match_ids_break_hbonds))
+        score_changes = [(j, score_change_after_adding_match(M_scores, accepted_match_ids, j, match_ids_problematic))
                 for j in range(len(matches_with_anchor))]
 
         best_match = min(score_changes, key=lambda x : x[1])
@@ -238,13 +262,17 @@ def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, m
             break
 
         accepted_match_ids.append(best_match[0])
+        total_ligand_interaction_score += ligand_interaction_scores[best_match[0]]
 
     # Reject the binding site if not enough hbond interaction is found
 
     if sum(1 if matches_with_anchor[i].hbond_match else 0 for i in accepted_match_ids) < min_hbond_match:
-        return []
+        return [], 0
 
-    return [matches_with_anchor[i] for i in accepted_match_ids]
+    if total_ligand_interaction_score > ligand_interaction_score_cutoff:
+        return [], 0
+
+    return [matches_with_anchor[i] for i in accepted_match_ids], total_ligand_interaction_score
 
 def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_residue, matches,
         target_output_file, matched_fuzz_output_file):

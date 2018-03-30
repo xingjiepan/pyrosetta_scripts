@@ -52,7 +52,7 @@ import fuzzball_matching
 import pick_matches
 
 
-def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_size=5):
+def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_size=3, max_num_outputs=10):
     '''Find matches for a pair of target and fuzz ball.'''
     # Load inputs
 
@@ -83,22 +83,32 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
 
     print 'Start picking matches.'
 
-    for match_id, matches_for_anchor in enumerate(matches):
+    all_picked_matches = []
+
+    for matches_for_anchor in matches:
        
         # Only construct binding sites from the raw matches with more than min_match_size * 1.5 matches
 
         if len(matches_for_anchor) >= min_match_size * 1.5: 
             picked_matches = pick_matches.pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_id)
-            print len(picked_matches)
+            print len(picked_matches[0]), picked_matches[1]
             
-            if len(picked_matches) >= min_match_size:
-                match_output_path = os.path.join(output_path, '{0}_{1}'.format(len(picked_matches), match_id))
+            if len(picked_matches[0]) >= min_match_size:
+                all_picked_matches.append(picked_matches)
+    
+    all_picked_matches = sorted(all_picked_matches, key=lambda x : x[1])
 
-                if not os.path.exists(match_output_path):
-                    os.mkdir(match_output_path)
+    # Dump the picked matches
 
-                pick_matches.dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_id, picked_matches,
-                        os.path.join(match_output_path, 'target_pose.pdb'), os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
+    for match_id, picked_matches in enumerate(all_picked_matches[:max_num_outputs]):
+
+        match_output_path = os.path.join(output_path, '{0}_{1}_{2}'.format(match_id, len(picked_matches[0]), int(picked_matches[1])))
+
+        if not os.path.exists(match_output_path):
+            os.mkdir(match_output_path)
+
+        pick_matches.dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_id, picked_matches[0],
+                os.path.join(match_output_path, 'target_pose.pdb'), os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
 
 
 if __name__ == '__main__':
@@ -162,4 +172,4 @@ if __name__ == '__main__':
                 match(job[0], job[1], job[2], int(arguments['--ligand_id']), job[3])
             
             end_time = time.time()
-            print 'Finish job {0}/{1} in {2} seconds.'.format(i, len(jobs), int(end_time - start_time))
+            print 'Finish job {0}/{1} in {2} seconds.'.format(i + 1, len(jobs), int(end_time - start_time))

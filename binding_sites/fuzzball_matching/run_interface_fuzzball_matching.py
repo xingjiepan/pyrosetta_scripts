@@ -87,7 +87,7 @@ def match(fuzzball_pdb, target_pdb, ligand_id, output_path, min_match_size=5, cu
         # Only construct binding sites from the raw matches with more than min_match_size * 1.5 matches
 
         if len(matches_for_anchor) >= min_match_size * 1.5: 
-            picked_matches = pick_matches.pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_id)
+            picked_matches, total_ligand_interaction_score = pick_matches.pick_lowest_score_matches_greedy(target_pose, fuzz_pose, matches_for_anchor, ligand_id)
             print len(picked_matches)
             
             if len(picked_matches) >= min_match_size:
@@ -148,4 +148,4 @@ if __name__ == '__main__':
                 match(job[0], job[1], int(arguments['--ligand_id']), job[2])
             
             end_time = time.time()
-            print 'Finish job {0}/{1} in {2} seconds.'.format(i, len(jobs), int(end_time - start_time))
+            print 'Finish job {0}/{1} in {2} seconds.'.format(i + 1, len(jobs), int(end_time - start_time))
