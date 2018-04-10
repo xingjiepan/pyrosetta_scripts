@@ -106,9 +106,12 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
 
         if not os.path.exists(match_output_path):
             os.mkdir(match_output_path)
+    
+        matched_motif_residues = '_'.join([str(m.target_matched_residue) for m in picked_matches[0]])
 
         pick_matches.dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_id, picked_matches[0],
-                os.path.join(match_output_path, 'target_pose.pdb'), os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
+                os.path.join(match_output_path, 'target_pose_M{0}M.pdb'.format(matched_motif_residues)), 
+                os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
 
 
 if __name__ == '__main__':

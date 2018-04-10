@@ -275,7 +275,7 @@ def pick_lowest_score_matches_greedy(target_pose_original, fuzz_pose_original, m
     return [matches_with_anchor[i] for i in accepted_match_ids], total_ligand_interaction_score
 
 def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_residue, matches,
-        target_output_file, matched_fuzz_output_file):
+        target_output_file, matched_fuzz_output_file, mutate_to_ala=False):
     '''Dump matches for an anchor.'''
     
     # Make copies of the poses
@@ -283,9 +283,10 @@ def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_
     target_pose = target_pose_original.clone()
     fuzz_pose = fuzz_pose_original.clone()
 
-    # Mutate all residues on the target to ALA
-    
-    mutate_residues(target_pose, range(1, target_pose.size() + 1), 'ALA')
+    # Mutate all residues on the target to ALA if required
+  
+    if mutate_to_ala:
+        mutate_residues(target_pose, range(1, target_pose.size() + 1), 'ALA')
 
     # Align the anchor
 
@@ -296,6 +297,10 @@ def dump_matches_for_an_anchor(target_pose_original, fuzz_pose_original, ligand_
 
     for match in matches:
         apply_match(target_pose, fuzz_pose, match)
+
+    # Append the ligand to the target pose
+
+    target_pose.append_residue_by_jump(fuzz_pose.residue(ligand_residue).clone(), 1)
 
     # Extract the matched part of the fuzz pose
 
