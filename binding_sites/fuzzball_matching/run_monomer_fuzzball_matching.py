@@ -40,6 +40,7 @@ Options:
 
 import os
 import time
+import shutil
 
 import docopt
 import numpy as np
@@ -118,7 +119,7 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
     print 'Dumped {0} matches'.format(len(os.listdir(output_path)))
 
     if len(os.listdir(output_path)) == 0:
-        os.rmdir(output_path)
+        shutil.rmtree(output_path)
         print 'Removed empty directory', output_path
 
 
