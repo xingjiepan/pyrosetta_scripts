@@ -119,6 +119,7 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
 
     if len(os.listdir(output_path)) == 0:
         os.rmdir(output_path)
+        print 'Removed empty directory', output_path
 
 
 if __name__ == '__main__':
