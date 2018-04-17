@@ -113,6 +113,11 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
                 os.path.join(match_output_path, 'target_pose_M{0}M.pdb'.format(matched_motif_residues)), 
                 os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
 
+    # Remove the output path if no match was found
+
+    if len(os.listdir(output_path)) == 0:
+        os.rmdir(output_path)
+
 
 if __name__ == '__main__':
     arguments = docopt.docopt(__doc__)
