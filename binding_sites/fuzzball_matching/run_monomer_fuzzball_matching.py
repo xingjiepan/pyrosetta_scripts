@@ -40,7 +40,6 @@ Options:
 
 import os
 import time
-import shutil
 
 import docopt
 import numpy as np
@@ -55,6 +54,13 @@ import pick_matches
 
 def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_size=3, max_num_outputs=10):
     '''Find matches for a pair of target and fuzz ball.'''
+    # Create the output dir
+    
+    try:
+        os.mkdir(output_path)
+    except OSError:
+        pass
+
     # Load inputs
 
     fuzz_pose = preprocessing.load_cleaned_filtered_fuzz_pose(fuzzball_pdb, ligand_id)
@@ -116,12 +122,8 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
 
     # Remove the output path if no match was found
 
-    print 'Dumped {0} matches'.format(len(os.listdir(output_path)))
-
     if len(os.listdir(output_path)) == 0:
-        shutil.rmtree(output_path)
-        print 'Removed empty directory', output_path
-
+        os.rmdir(output_path)
 
 if __name__ == '__main__':
     arguments = docopt.docopt(__doc__)
@@ -159,11 +161,6 @@ if __name__ == '__main__':
             # Create the output directory
 
             job_output_dir = os.path.join(arguments['--output_dir'], tf.split('.')[0] + '_' + ff.split('.')[0])
-
-            try:
-                os.mkdir(job_output_dir)
-            except OSError:
-                pass
 
             jobs.append((os.path.join(fuzz_ball_dir, ff),
                          os.path.join(target_pdb_dir, tf),
