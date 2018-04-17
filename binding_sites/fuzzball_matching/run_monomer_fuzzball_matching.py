@@ -110,8 +110,8 @@ def match(fuzzball_pdb, target_pdb, pos_file, ligand_id, output_path, min_match_
         matched_motif_residues = '_'.join([str(m.target_matched_residue) for m in picked_matches[0]])
 
         pick_matches.dump_matches_for_an_anchor(target_pose, fuzz_pose, ligand_id, picked_matches[0],
-                os.path.join(match_output_path, 'target_pose_M{0}M.pdb'.format(matched_motif_residues)), 
-                os.path.join(match_output_path, 'matched_fuzz_pose.pdb'))
+                os.path.join(match_output_path, 'target_pose_M{0}M.pdb.gz'.format(matched_motif_residues)), 
+                os.path.join(match_output_path, 'matched_fuzz_pose.pdb.gz'))
 
     # Remove the output path if no match was found
 
@@ -137,16 +137,16 @@ if __name__ == '__main__':
     jobs = []
 
     for ff in os.listdir(fuzz_ball_dir):
-        if not ff.endswith('.pdb'): continue
+        if not (ff.endswith('.pdb') or ff.endswith('.pdb.gz')): continue
 
         for tf in os.listdir(target_pdb_dir):
-            if not tf.endswith('.pdb'): continue
+            if not (tf.endswith('.pdb') or ff.endswith('.pdb.gz')): continue
         
             # Find the position file
             
             pf_found = False
             for pf in os.listdir(target_pdb_dir):
-                if pf.endswith('.pos') and pf.startswith(tf[:4]):
+                if pf.endswith('.pos') and pf.startswith(tf.split('.')[0]):
                     pf_found = True
                     break
 
@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
             # Create the output directory
 
-            job_output_dir = os.path.join(arguments['--output_dir'], tf[:-4] + '_' + ff[:-4])
+            job_output_dir = os.path.join(arguments['--output_dir'], tf.split('.')[0] + '_' + ff.split('.')[0])
 
             try:
                 os.mkdir(job_output_dir)
