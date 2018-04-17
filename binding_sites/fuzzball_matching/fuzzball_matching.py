@@ -130,11 +130,11 @@ def find_matched_rotamers_for_anchored_fuzz_ball(target_pose, target_matching_se
 
     return matches
 
-def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
+def find_matched_rotamers_for_fuzz_ball(target_pose_original, target_matching_seqposes,
         fuzz_pose, ligand_residue, motif_residues, bb_compatible_rotamers):
     '''Find all rotamers that could match the fuzz ball to the target pose.
     Args:
-        target_pose: The target pose.
+        target_pose_original: The target pose.
         target_matching_seqposes: The residues on the target pose that are available for
             motif matching.
         fuzz_pose: The fuzz ball pose.
@@ -146,7 +146,10 @@ def find_matched_rotamers_for_fuzz_ball(target_pose, target_matching_seqposes,
     Return:
         A list of lists for matches of each anchor.
     '''
-   
+    # Make a local clone of the target pose
+
+    target_pose = target_pose_original.clone()
+
     # Set up the fold tree that roots on the ligand residue
 
     set_up_fold_tree_for_root_residue(fuzz_pose, ligand_residue)
