@@ -10,7 +10,21 @@ from pyrosetta import rosetta
 from fuzzball_matching_basic import *
 
 
-def anchor_is_good(target_pose, fuzz_pose, target_anchor, fuzz_anchor, ligand_residue):
+def residue_contact_degree(target_residue, pose_to_compare_with, cutoff_distance=10):
+    '''Calculate the contact degrees of a target residue against
+    residues of a pose to compare with. For one residue, the contact degree
+    is the number of residues to which the NBR-NBR distance is within a 
+    given cutoff_distance.
+    '''
+    contact_degree = 0
+
+    for r2 in range(1, pose_to_compare_with.size() + 1):
+        if target_residue.nbr_atom_xyz().distance(pose_to_compare_with.residue(r2).nbr_atom_xyz()) < cutoff_distance:
+            contact_degree += 1
+
+    return contact_degree
+
+def anchor_is_good(target_pose, fuzz_pose, target_anchor, fuzz_anchor, ligand_residue, ligand_contact_degree_cutoff=10):
     '''Return true if an anchor is good.'''
     if intra_residue_heavy_atom_clash(fuzz_pose.residue(fuzz_anchor)):
         return False
@@ -27,6 +41,9 @@ def anchor_is_good(target_pose, fuzz_pose, target_anchor, fuzz_anchor, ligand_re
 
         elif residue_heavy_atom_clashes(fuzz_pose.residue(fuzz_anchor), target_pose.residue(res), res2_sc=False):
             return False
+
+    if residue_contact_degree(fuzz_pose.residue(ligand_residue), target_pose) < ligand_contact_degree_cutoff:
+        return False
 
     return True
 
