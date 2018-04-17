@@ -158,7 +158,7 @@ if __name__ == '__main__':
 
             if not pf_found: continue 
 
-            # Create the output directory
+            # Decide the output directory
 
             job_output_dir = os.path.join(arguments['--output_dir'], tf.split('.')[0] + '_' + ff.split('.')[0])
 
