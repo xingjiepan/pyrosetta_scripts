@@ -146,7 +146,7 @@ if __name__ == '__main__':
         if not (ff.endswith('.pdb') or ff.endswith('.pdb.gz')): continue
 
         for tf in os.listdir(target_pdb_dir):
-            if not (tf.endswith('.pdb') or ff.endswith('.pdb.gz')): continue
+            if not (tf.endswith('.pdb') or tf.endswith('.pdb.gz')): continue
         
             # Find the position file
             
