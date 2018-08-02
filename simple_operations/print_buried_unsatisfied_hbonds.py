@@ -11,6 +11,51 @@ import pyrosetta
 from pyrosetta import rosetta
 
 
+def get_buhs_for_each_res(pose):
+    '''Return a list of numbers of buried unsatisfied
+    hbonds for each residue.
+    '''
+    bupc = rosetta.protocols.simple_pose_metric_calculators.BuriedUnsatisfiedPolarsCalculator(
+            'default', 'default')
+
+    sfxn = rosetta.core.scoring.get_score_function()
+    sfxn(pose)
+  
+    return json.loads(bupc.get('residue_bur_unsat_polars', pose))
+
+def get_backrub_ensemble_consensus_buhs_for_each_res(pose):
+    '''Get the list of numbers of ensemble consensus buried unsatisfied
+    hbonds for each residue.
+    '''
+    br_mover = rosetta.protocols.backrub.BackrubMover()
+    br_mover.set_max_atoms(4)
+    
+    buhs_for_each_res = get_buhs_for_each_res(pose)
+    
+    # Update the number of segments
+    
+    tmp_pose = pose.clone()
+    br_mover.apply(tmp_pose)
+
+    # Iterate throught all segments
+
+    for i in range(1, br_mover.num_segments() + 1):
+        br_mover.set_next_segment_id(i)
+       
+        # For each segment, generate 5 structures
+        
+        for j in range(5):
+            tmp_pose = pose.clone()
+            br_mover.apply(tmp_pose)
+            tmp_buh_for_each_res = get_buhs_for_each_res(tmp_pose)
+           
+            # Only keep the consensus buried unsats
+
+            for k in range(len(buhs_for_each_res)):
+                buhs_for_each_res[k] = min(buhs_for_each_res[k], tmp_buh_for_each_res[k])
+
+    return buhs_for_each_res
+
 if __name__ == '__main__':
     pdb_file = sys.argv[1]
 
@@ -22,15 +67,8 @@ if __name__ == '__main__':
 
     # Get the buried unsats
 
-    bupc = rosetta.protocols.simple_pose_metric_calculators.BuriedUnsatisfiedPolarsCalculator(
-            'default', 'default')
-
-    sfxn = rosetta.core.scoring.get_score_function()
-    sfxn(pose)
-  
-    metric_value = rosetta.basic.MetricValueBase()
-
-    buhs_for_each_res = json.loads(bupc.get('residue_bur_unsat_polars', pose))
+    #buhs_for_each_res = get_buhs_for_each_res(pose)
+    buhs_for_each_res = get_backrub_ensemble_consensus_buhs_for_each_res(pose)
 
     # Print residues with buried unsats
 
