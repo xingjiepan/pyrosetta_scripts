@@ -15,8 +15,8 @@ def symmetrize_monomer(pose, repeat_unit_start_point, repeat_unit_stop_point):
     '''Symmetrize a pose.'''
     # Idealize the pose
 
-    for i in range(1, pose.size() + 1):
-        rosetta.core.conformation.idealize_position(i, pose.conformation())
+    im = rosetta.protocols.idealize.IdealizeMover()
+    im.apply(pose)
 
     # Symmetrize the monomer
 
