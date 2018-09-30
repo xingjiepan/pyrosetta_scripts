@@ -117,6 +117,15 @@ def get_backrub_ensemble_consensus_buhs_for_each_atom(pose):
 
     return buried_unsat_acceptors, buried_unsat_donors
 
+def print_pymol_selection_for_buried_unsats(pose, buried_unsats):
+    '''Print pymol selection for the buried unsatisfied hond atoms.'''
+    buried_unsats_strs = []
+    for res, a in buried_unsats:
+        buried_unsats_strs.append('(c. {0} and res {1} and n. {2})'.format(
+            pose.pdb_info().chain(res), pose.pdb_info().pose2pdb(res).split()[0], pose.residue(res).atom_name(a).strip()))
+
+    print('sele buried_unsats, ' + ' '.join(buried_unsats_strs))
+
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-b", "--backrub", dest="backrub", action="store_true", default=False,
@@ -148,3 +157,4 @@ if __name__ == '__main__':
     for seqpos, a in buried_unsat_donors:
         print(pose.residue(seqpos).name3(), seqpos, pose.residue(seqpos).atom_name(a))
 
+    print_pymol_selection_for_buried_unsats(pose, buried_unsat_acceptors + buried_unsat_donors)
