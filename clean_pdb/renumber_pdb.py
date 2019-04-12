@@ -30,10 +30,9 @@ if __name__ == '__main__':
     pose = rosetta.core.pose.Pose()
     rosetta.core.import_pose.pose_from_file(pose, ipdb)
 
-    if 1 != start_num:
-        for i in range(1, pose.size() + 1):
-            pose.pdb_info().set_resinfo(i, 'A', i + start_num - 1)
+    for i in range(1, pose.size() + 1):
+        pose.pdb_info().set_resinfo(i, 'A', i + start_num - 1)
 
-            print(i, pose.pdb_info().pose2pdb(i))
+        print(i, pose.pdb_info().pose2pdb(i))
 
     pose.dump_pdb(opdb)
